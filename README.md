@@ -1,6 +1,6 @@
 # Importer from OpenQASM 3 to Qiskit
 
-[![License](https://img.shields.io/github/license/jakelishman/qiskit-qam3-import.svg?style=popout-square)](https://opensource.org/licenses/Apache-2.0)<!--- long-description-skip-begin -->[![Release](https://img.shields.io/github/release/jakelishman/qiskit-qasm3-import.svg?style=popout-square)](https://github.com/jakelishman/qiskit-qasm3-import/releases)[![Downloads](https://img.shields.io/pypi/dm/openqasm-pygments.svg?style=popout-square)](https://pypi.org/project/qiskit-qasm3-import/)<!--- long-description-skip-end -->
+[![License](https://img.shields.io/github/license/jakelishman/qiskit-qasm3-import.svg?style=popout-square)](https://opensource.org/licenses/Apache-2.0)<!--- long-description-skip-begin -->[![Release](https://img.shields.io/github/release/jakelishman/qiskit-qasm3-import.svg?style=popout-square)](https://github.com/jakelishman/qiskit-qasm3-import/releases)[![Downloads](https://img.shields.io/pypi/dm/qiskit-qasm3-import.svg?style=popout-square)](https://pypi.org/project/qiskit-qasm3-import/)<!--- long-description-skip-end -->
 
 This repository provides the Python package `qiskit_qasm3_import`, which is a
 basic and temporary importer from OpenQASM 3 into Qiskit's `QuantumCircuit`.
@@ -19,8 +19,8 @@ example shows a lot of the capabilities of the importer.
 
 ```qasm
 OPENQASM 3.0;
-// The 'stdgates.inc' is supported, and the gates are only available if it
-// has correctly been included.
+// The 'stdgates.inc' include is supported, and the gates are only available
+// if it has correctly been included.
 include "stdgates.inc";
 
 // Parametrised inputs are supported.
@@ -108,7 +108,7 @@ out_2: ════════╩═══════════════�
 
 ## Installation
 
-Install the latest release of `qiskit_qasm3_import` package from pip:
+Install the latest release of the `qiskit_qasm3_import` package from pip:
 
 ```bash
 pip install qiskit_qasm3_import
@@ -143,6 +143,33 @@ pip install -e .
 
 After this, any changes you make to the library code will immediately be present
 when you open a new Python interpreter session.
+
+
+### Building documentation
+
+After the development requirements have been installed, the command
+
+```bash
+tox -e docs
+```
+
+will build the HTML documentation, and place it in `docs/_build/html`.
+
+
+### Code style and linting
+
+The Python components of this repository are formatted using `black`.  You can
+run this on the required files by running
+
+```bash
+tox -e black
+```
+
+The full lint suite can be run with
+
+```bash
+tox -e lint
+```
 
 
 ## License
