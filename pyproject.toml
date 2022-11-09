@@ -1,0 +1,74 @@
+[build-system]
+requires = ["setuptools", "wheel"]
+build-backend = "setuptools.build_meta"
+
+[tool.black]
+line-length = 100
+target-version = ["py38", "py39", "py310", "py311"]
+
+[tool.pylint.main]
+# Minimum supported Python version.
+py-version = "3.8"
+[tool.pylint.basic]
+# Naming convention for objects that do not require docstrings.
+no-docstring-rgx = "^_"
+[tool.pylint.classes]
+# List of method names used to declare (i.e. assign) instance attributes.
+defining-attr-methods = ["__init__", "__new__", "setUp", "__post_init__"]
+# List of member names, which should be excluded from the protected access
+# warning.
+exclude-protected = ["_asdict", "_fields", "_replace", "_source", "_make"]
+# List of valid names for the first argument in a class method.
+valid-classmethod-first-arg = ["cls"]
+# List of valid names for the first argument in a metaclass class method.
+valid-metaclass-classmethod-first-arg = ["cls"]
+[tool.pylint.exceptions]
+# Exceptions that will emit a warning when caught.
+overgeneral-exceptions = ["BaseException"]
+[tool.pylint."messages control"]
+disable = [
+    "bad-indentation",
+    "bad-inline-option",
+    "deprecated-pragma",
+    "duplicate-code",
+    "file-ignored",
+    "fixme",
+    "invalid-name",
+    "line-too-long",
+    "locally-disabled",
+    "not-context-manager",  # Too many false negatives.
+    "missing-class-docstring",
+    "missing-final-newline",
+    "missing-function-docstring",
+    "missing-module-docstring",
+    "multiple-statements",
+    "raw-checker-failed",
+    "redefined-builtin",
+    "redefined-outer-name",
+    "suppressed-message",
+    "too-few-public-methods",
+    "too-many-public-methods",
+    "too-many-arguments",
+    "too-many-instance-attributes",
+    "too-many-locals",
+    "trailing-whitespace",
+    "unknown-option-value",
+    "unnecessary-semicolon",
+    "unneeded-not",
+    "unused-wildcard-import",
+    "use-implicit-booleaness-not-len",
+    "use-symbolic-message-instead",
+    "useless-option-value",
+    "useless-suppression",
+    "wrong-import-order",
+    "wrong-import-position",
+]
+[tool.pylint.variables]
+# Tells whether unused global variables should be treated as a violation.
+allow-global-unused-variables = true
+# A regular expression matching the name of dummy variables (i.e. expected to not
+# be used).
+dummy-variables-rgx = "_.*"
+ignored-argument-names = "_.*"
+# List of qualified module names which can have objects that can redefine builtins.
+redefining-builtins-modules = ["six.moves", "past.builtins", "future.builtins", "builtins", "io"]
