@@ -46,7 +46,10 @@ jobs:
       - uses: actions/upload-artifact@v3
         with:
           name: qiskit-qasm3-import-docs
-          path: ./docs/_build/html/*
+          path: |
+            ./docs/_build/html/*
+            !**/.doctrees
+            !**/.buildinfo
           if-no-files-found: error
 
   tests:
