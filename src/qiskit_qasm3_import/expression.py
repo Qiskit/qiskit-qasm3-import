@@ -63,6 +63,8 @@ class ValueResolver(QASMVisitor):
         self.symbols = symbols
 
     def resolve(self, node: ast.Expression) -> Tuple[Any, types.Type]:
+        """The entry point to the resolver, resolving the AST node into a 2-tuple of a relevant
+        Qiskit type, and the :class:`.Type` that it is an instance of."""
         return self.visit(node)
 
     def visit(self, node: ast.QASMNode, context: None = None) -> Tuple[Any, types.Type]:

@@ -1,6 +1,6 @@
 import qiskit_qasm3_import
 
-project = 'OpenQASM Pygments Tools'
+project = 'Qiskit OpenQASM 3 Importer'
 copyright = '2022, Jake Lishman'
 author = 'Jake Lishman'
 version = qiskit_qasm3_import.__version__
