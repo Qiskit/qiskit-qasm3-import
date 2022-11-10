@@ -11,6 +11,7 @@ This project is a stop-gap measure until those issues can be resolved the
 correct way; Terra makes strong guarantees of stability and support in its
 interfaces, and we are not yet ready to make that commitment for this project.
 
+
 ## Example
 
 The principal entry point to the package is the top-level `parse` function,
@@ -153,7 +154,9 @@ After the development requirements have been installed, the command
 tox -e docs
 ```
 
-will build the HTML documentation, and place it in `docs/_build/html`.
+will build the HTML documentation, and place it in `docs/_build/html`.  The
+documentation state of the `main` branch of this repository is published to
+https://jakelishman.github.io/qiskit-qasm3-import.
 
 
 ### Code style and linting
