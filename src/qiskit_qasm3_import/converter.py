@@ -4,8 +4,12 @@ import itertools
 import math
 import re
 import string
+import sys
 
-from collections.abc import Iterator, Sequence
+if sys.version_info < (3, 9):
+    from typing import Iterator, Sequence
+else:
+    from collections.abc import Iterator, Sequence
 from typing import Any, Callable, List, NoReturn, Optional, Tuple, Union
 
 from openqasm3 import ast

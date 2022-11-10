@@ -52,6 +52,7 @@ disable = [
     "too-many-instance-attributes",
     "too-many-locals",
     "trailing-whitespace",
+    "ungrouped-imports",
     "unknown-option-value",
     "unnecessary-semicolon",
     "unneeded-not",
