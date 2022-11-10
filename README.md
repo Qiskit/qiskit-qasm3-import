@@ -133,7 +133,7 @@ pip install -r requirements-dev.txt tox
 
 This installs a few more packages than the dependencies of the package at
 runtime, because there are some tools we use for testing also included, such as
-`tox` and `stestr`.
+`tox` and `pytest`.
 
 After the development requirements are installed, you can install an editable
 version of the package with
