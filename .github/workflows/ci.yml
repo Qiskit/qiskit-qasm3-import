@@ -82,6 +82,12 @@ jobs:
     runs-on: ubuntu-latest
     needs: [docs]
     if: github.event_name == 'push'
+    permissions:
+      pages: write
+      id-token: write
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
 
     steps:
       - uses: actions/checkout@v3
@@ -91,10 +97,11 @@ jobs:
           name: qiskit-qasm3-import-docs
           path: deploy
 
-      - uses: JamesIves/github-pages-deploy-action@v4.4.1
+      - name: Repackage for GitHub Pages
+        uses: actions/upload-pages-artifact@v1
         with:
-          token: ${{ secrets.GHPAGES_DEPLOY_TOKEN }}
-          repository-name: jakelishman/jakelishman.github.io
-          branch: main
-          folder: deploy
-          target-folder: qiskit-qasm3-import
+          path: deploy
+
+      - name: Deploy to GitHub Pages
+        id: deployment
+        uses: actions/deploy-pages@v1

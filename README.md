@@ -1,15 +1,17 @@
 # Importer from OpenQASM 3 to Qiskit
 
-[![License](https://img.shields.io/github/license/jakelishman/qiskit-qasm3-import.svg?style=popout-square)](https://opensource.org/licenses/Apache-2.0)<!--- long-description-skip-begin -->[![Release](https://img.shields.io/github/release/jakelishman/qiskit-qasm3-import.svg?style=popout-square)](https://github.com/jakelishman/qiskit-qasm3-import/releases)[![Downloads](https://img.shields.io/pypi/dm/qiskit-qasm3-import.svg?style=popout-square)](https://pypi.org/project/qiskit-qasm3-import/)<!--- long-description-skip-end -->
+[![License](https://img.shields.io/github/license/Qiskit/qiskit-qasm3-import.svg?style=flat)](https://opensource.org/licenses/Apache-2.0)[![Release](https://img.shields.io/github/release/Qiskit/qiskit-qasm3-import.svg?style=flat)](https://github.com/Qiskit/qiskit-qasm3-import/releases)[![Downloads](https://img.shields.io/pypi/dm/qiskit-qasm3-import.svg?style=flat)](https://pypi.org/project/qiskit-qasm3-import/)
 
 This repository provides the Python package `qiskit_qasm3_import`, which is a
 basic and temporary importer from OpenQASM 3 into Qiskit's `QuantumCircuit`.
 
-Qiskit itself does not yet have this functionality due to ongoing technical
-discussions about the future direction of various data structures within Terra.
-This project is a stop-gap measure until those issues can be resolved the
-correct way; Terra makes strong guarantees of stability and support in its
-interfaces, and we are not yet ready to make that commitment for this project.
+Qiskit itself accepts this package as an optional dependency if it is installed.
+In that case, Qiskit exposes the functions `qiskit.qasm3.load` and
+`qiskit.qasm3.loads`, which are wrappers around `qiskit_qasm3_import.parse`.
+This project is a stop-gap measure until various technical decisions can be
+resolved the correct way; Terra makes strong guarantees of stability and support
+in its interfaces, and we are not yet ready to make that commitment for this
+project, hence the minimal wrappers.
 
 
 ## Example
@@ -111,12 +113,18 @@ out_2: ════════╩═══════════════�
 
 Install the latest release of the `qiskit_qasm3_import` package from pip:
 
-```bash
+```text
 pip install qiskit_qasm3_import
 ```
 
 This will automatically install all the dependencies as well (an OpenQASM 3
-parser, for example) if they are not already installed.
+parser, for example) if they are not already installed.  Alternatively, you can
+install Qiskit Terra directly with this package as an optional dependency by
+doing
+
+```text
+pip install qiskit-terra[qasm3-import]
+```
 
 
 ## Developing
@@ -156,7 +164,7 @@ tox -e docs
 
 will build the HTML documentation, and place it in `docs/_build/html`.  The
 documentation state of the `main` branch of this repository is published to
-https://jakelishman.github.io/qiskit-qasm3-import.
+https://qiskit.github.io/qiskit-qasm3-import.
 
 
 ### Code style and linting
