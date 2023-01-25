@@ -7,6 +7,7 @@ from qiskit.circuit import Clbit, Parameter, Qubit
 
 from qiskit_qasm3_import import types, ConversionError
 from qiskit_qasm3_import.data import Symbol, Scope
+from qiskit_qasm3_import.converter import State
 from qiskit_qasm3_import.expression import ValueResolver
 
 
@@ -47,6 +48,16 @@ def test_identifier():
         assert resolved_type == symbol.type
     with pytest.raises(ConversionError, match="not defined in this scope"):
         resolver.resolve(ast.Identifier(name="c"))
+
+
+def test_physical_qubit_identifier():
+    resolver = ValueResolver(symbols={})
+    for name in ("$0", "$123"):
+        q0, q0_type = resolver.resolve(ast.Identifier(name=name), context=State(Scope.GLOBAL))
+        assert isinstance(q0, Qubit)
+        assert isinstance(q0_type, types.Qubit)
+    with pytest.raises(ConversionError, match="not defined in this scope"):
+        resolver.resolve(ast.Identifier(name="$q"))
 
 
 def test_discrete_set_empty():

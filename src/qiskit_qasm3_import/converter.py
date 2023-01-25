@@ -26,11 +26,18 @@ from qiskit.circuit import (
 )
 from qiskit.circuit.parametertable import ParameterReferences
 from qiskit.circuit.library import standard_gates as _std
+from qiskit.transpiler import Layout
+from qiskit.transpiler.layout import TranspileLayout
 
 from . import types
-from .data import Scope, Symbol
+from .data import Scope, Symbol, AddressingMode
 from .exceptions import ConversionError, raise_from_node
-from .expression import ValueResolver, resolve_condition
+from .expression import (
+    ValueResolver,
+    resolve_condition,
+    is_physical,
+    physical_qubit_identifiers_to_ints,
+)
 
 
 _STDGATES = {
@@ -89,7 +96,7 @@ _BUILTINS = {
 
 
 class State:
-    __slots__ = ("scope", "source", "circuit", "symbol_table", "_unique")
+    __slots__ = ("scope", "source", "circuit", "symbol_table", "_unique", "addressing_mode")
 
     def __init__(self, scope: Scope, source: Optional[str] = None):
         self.scope = scope
@@ -97,6 +104,7 @@ class State:
         self.circuit = QuantumCircuit()
         self.symbol_table = _BUILTINS.copy()
         self._unique = (f"_{x}" for x in itertools.count())
+        self.addressing_mode = AddressingMode()
 
     def gate_scope(self):
         """Get a new state for entry to a "gate" scope."""
@@ -183,13 +191,23 @@ class ConvertVisitor(QASMVisitor[State]):
     # In some places, such as symbol definitions, we do some simple checks to help everyone's
     # sanity, as the reference package doesn't yet do this.
 
-    # pylint: disable=missing-function-docstring,no-self-use,unused-argument
+    # pylint: disable=missing-function-docstring,no-self-use,unused-argument,protected-access
 
     def convert(self, node: ast.Program, *, source: Optional[str] = None) -> QuantumCircuit:
         """Convert a program node into a :class:`~qiskit.circuit.QuantumCircuit`.  If given,
         `source` is a string containing the OpenQASM 3 source code that was parsed into `node`.
         This is used to generated improved error messages."""
-        return self.visit(node, State(Scope.GLOBAL, source)).circuit
+
+        state = self.visit(node, State(Scope.GLOBAL, source))
+        symbols = state.symbol_table
+        if any(is_physical(name) for name in symbols.keys()):
+            names = filter(is_physical, symbols.keys())
+            intlist = physical_qubit_identifiers_to_ints(names)
+            qr = QuantumRegister(len(intlist), "qr")
+            initial_layout = Layout.from_intlist(intlist, qr)
+            input_qubit_mapping = dict(zip(qr, intlist))
+            state.circuit._layout = TranspileLayout(initial_layout, input_qubit_mapping)
+        return state.circuit
 
     def _raise_previously_defined(self, new: Symbol, old: Symbol, node: ast.QASMNode) -> NoReturn:
         message = f"'{new.name}' is already defined."
@@ -265,7 +283,7 @@ class ConvertVisitor(QASMVisitor[State]):
         context.circuit._parameter_table[parameter] = ParameterReferences(())
 
     def _resolve_generic(self, node: ast.Expression, context: State) -> Tuple[Any, types.Type]:
-        return ValueResolver(context.symbol_table).resolve(node)
+        return ValueResolver(context.symbol_table).resolve(node, context)
 
     def _resolve_constant_int(self, node: ast.Expression, context: State) -> int:
         value, type = self._resolve_generic(node, context)
@@ -312,7 +330,7 @@ class ConvertVisitor(QASMVisitor[State]):
     def _resolve_condition(
         self, node: ast.Expression, context: State
     ) -> Union[Tuple[ClassicalRegister, int], Tuple[Clbit, bool]]:
-        lhs, rhs = resolve_condition(node, context.symbol_table)
+        lhs, rhs = resolve_condition(node, context)
         if not isinstance(lhs, (Clbit, ClassicalRegister)):
             name = context.unique_name()
             lhs = ClassicalRegister(name=_escape_qasm2(name), bits=lhs)
@@ -339,6 +357,11 @@ class ConvertVisitor(QASMVisitor[State]):
         return context
 
     def visit_QubitDeclaration(self, node: ast.QubitDeclaration, context: State) -> State:
+        if not context.addressing_mode.set_virtual_mode():
+            raise_from_node(
+                node,
+                "Virtual qubit declared in physical addressing mode. Mixing modes not currently supported.",
+            )
         name = node.qubit.name
         if node.size is None:
             bit = Qubit()
