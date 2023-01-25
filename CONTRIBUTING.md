@@ -1,4 +1,4 @@
-# Contributing to `openqasm-pygments`
+# Contributing to `qiskit-qasm3-import`
 
 Thanks for your interest in contributing!  Please make sure you follow our
 [code of conduct](https://github.com/Qiskit/qiskit-qasm3-import/blob/main/CODE_OF_CONDUCT.md)
