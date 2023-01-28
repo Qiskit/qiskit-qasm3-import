@@ -84,10 +84,7 @@ class ValueResolver(QASMVisitor):
         return self.visit(node, context)
 
     def visit(self, node: ast.QASMNode, context: None = None) -> Tuple[Any, types.Type]:
-        if context is None:
-            value, type = super().visit(node)
-        else:
-            value, type = super().visit(node, context)
+        value, type = super().visit(node, context)
         if isinstance(type, types.Error):
             raise_from_node(node, "type error")
         return value, type
