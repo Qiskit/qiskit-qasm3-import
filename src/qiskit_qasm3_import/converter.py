@@ -209,18 +209,6 @@ class ConvertVisitor(QASMVisitor[State]):
             state.circuit._layout = TranspileLayout(initial_layout, input_qubit_mapping)
         return state.circuit
 
-    def newconvert(self, node: ast.Program, *, source: Optional[str] = None) -> QuantumCircuit:
-        state = self.visit(node, State(Scope.GLOBAL, source))
-        symbols = state.symbol_table
-        if any(is_physical(name) for name in symbols.keys()):
-            names = filter(is_physical, symbols.keys())
-            intlist = physical_qubit_identifiers_to_ints(names)
-            qr = QuantumRegister(len(intlist), "qr")
-            initial_layout = Layout.from_intlist(intlist, qr)
-            input_qubit_mapping = dict(zip(qr, intlist))
-            state.circuit._layout = TranspileLayout(initial_layout, input_qubit_mapping)
-        return state
-
     def _raise_previously_defined(self, new: Symbol, old: Symbol, node: ast.QASMNode) -> NoReturn:
         message = f"'{new.name}' is already defined."
         if old.definer and (span := old.definer.span) is not None:
