@@ -928,26 +928,30 @@ def test_alias_rejects_bad_types():
         parse(source)
 
 
-def test_reject_mixed_addressing_mode():
-    source1 = """
+def test_reject_mixed_addressing_mode_virtual_first():
+    source = """
     qubit q1;
     reset $0;
     """
     with pytest.raises(
         ConversionError, match="Physical qubit referenced in virtual addressing mode"
     ):
-        parse(source1)
+        parse(source)
 
-    source2 = """
+
+def test_reject_mixed_addressing_mode_hardware_first():
+    source = """
     reset $0;
     qubit q1;
     """
     with pytest.raises(ConversionError, match="Virtual qubit declared in physical addressing mode"):
-        parse(source2)
+        parse(source)
 
-    source3 = """
+
+def test_reject_mixed_addressing_mode_virtual_register():
+    source = """
     reset $0;
     qubit[3] q;
     """
     with pytest.raises(ConversionError, match="Virtual qubit declared in physical addressing mode"):
-        parse(source3)
+        parse(source)
