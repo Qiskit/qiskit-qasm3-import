@@ -30,7 +30,7 @@ from qiskit.transpiler import Layout
 from qiskit.transpiler.layout import TranspileLayout
 
 from . import types
-from .data import Scope, Symbol, AddressingMode
+from .data import Scope, Symbol
 from .exceptions import ConversionError, raise_from_node
 from .expression import (
     ValueResolver,
@@ -176,6 +176,35 @@ class GateBuilder:
         else:
             out._definition = self.definition.copy()
         return out
+
+
+class AddressingMode:
+    """Addressing mode for qubits in OpenQASM 3 programs.
+
+    This class is useful as long as we allow only physical or virtual addressing modes, but
+    not mixed. If the latter is supported in the future, this class will be modified or removed.
+    """
+
+    # 0 == UNKNOWN
+    # 1 == PHYSICAL
+    # 2 == VIRTUAL
+
+    def __init__(self):
+        self._state = 0
+
+    def set_physical_mode(self):
+        """Set the addressing mode to physical. On success return `True`, otherwise `False`."""
+        if self._state != 2:
+            self._state = 1
+            return True
+        return False
+
+    def set_virtual_mode(self):
+        """Set the addressing mode to virtual. On success return `True`, otherwise `False`."""
+        if self._state != 1:
+            self._state = 2
+            return True
+        return False
 
 
 class ConvertVisitor(QASMVisitor[State]):
