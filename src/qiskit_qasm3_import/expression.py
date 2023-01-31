@@ -96,14 +96,9 @@ class ValueResolver(QASMVisitor):
         name = node.name
         if name not in self.symbols:
             if is_physical(name):  # Physical qubits are not declared.
-                if not context.addressing_mode.set_physical_mode():
-                    raise_from_node(
-                        node,
-                        "Physical qubit referenced in virtual addressing mode. Mixing modes not currently supported.",
-                    )
-                bit = Qubit()
-                symbol = Symbol(name, bit, types.Qubit(), Scope.GLOBAL, node)
-                context.circuit.add_bits([bit])
+                context.addressing_mode.set_physical_mode(node)
+                context.circuit.add_bits([bit := Qubit()])
+                symbol = Symbol(name, bit, types.HardwareQubit(), Scope.GLOBAL, node)
                 self.symbols[name] = symbol
             else:
                 raise_from_node(node, f"name '{name}' is not defined in this scope")

@@ -95,6 +95,28 @@ _BUILTINS = {
 }
 
 
+class AddressingMode:
+    """Addressing mode for qubits in OpenQASM 3 programs.
+
+    This class is useful as long as we allow only physical or virtual addressing modes, but
+    not mixed. If the latter is supported in the future, this class will be modified or removed.
+    """
+    def __init__(self):
+        self._state = 0 # 0 == UNKNOWN, 1 == PHYSICAL, 2 == VIRTUAL
+
+    def set_physical_mode(self, node):
+        """Set the addressing mode to physical. On success return `True`, otherwise `False`."""
+        if self._state == 2:
+            raise_from_node(node, "Physical qubit referenced in virtual addressing mode. Mixing modes not currently supported.")
+        self._state = 1
+
+    def set_virtual_mode(self, node):
+        """Set the addressing mode to virtual. On success return `True`, otherwise `False`."""
+        if self._state == 1:
+            raise_from_node(node, "Virtual qubit declared in physical addressing mode. Mixing modes not currently supported.")
+        self._state = 2
+
+
 class State:
     __slots__ = ("scope", "source", "circuit", "symbol_table", "_unique", "addressing_mode")
 
@@ -178,33 +200,6 @@ class GateBuilder:
         return out
 
 
-class AddressingMode:
-    """Addressing mode for qubits in OpenQASM 3 programs.
-
-    This class is useful as long as we allow only physical or virtual addressing modes, but
-    not mixed. If the latter is supported in the future, this class will be modified or removed.
-    """
-
-    # 0 == UNKNOWN
-    # 1 == PHYSICAL
-    # 2 == VIRTUAL
-
-    def __init__(self):
-        self._state = 0
-
-    def set_physical_mode(self):
-        """Set the addressing mode to physical. On success return `True`, otherwise `False`."""
-        if self._state != 2:
-            self._state = 1
-            return True
-        return False
-
-    def set_virtual_mode(self):
-        """Set the addressing mode to virtual. On success return `True`, otherwise `False`."""
-        if self._state != 1:
-            self._state = 2
-            return True
-        return False
 
 
 class ConvertVisitor(QASMVisitor[State]):
@@ -229,7 +224,7 @@ class ConvertVisitor(QASMVisitor[State]):
 
         state = self.visit(node, State(Scope.GLOBAL, source))
         symbols = state.symbol_table
-        if any(is_physical(name) for name in symbols.keys()):
+        if any(isinstance(type, types.HardwareQubit) for type in symbols.values()):
             names = filter(is_physical, symbols.keys())
             intlist = physical_qubit_identifiers_to_ints(names)
             qr = QuantumRegister(len(intlist), "qr")
@@ -352,7 +347,7 @@ class ConvertVisitor(QASMVisitor[State]):
         self, node: ast.Expression, context: State
     ) -> Union[Qubit, QuantumRegister, List[Qubit]]:
         value, type = self._resolve_generic(node, context)
-        if not isinstance(type, (types.Qubit, types.QubitArray)):
+        if not isinstance(type, (types.Qubit, types.HardwareQubit, types.QubitArray)):
             raise_from_node(node, "required a qubit or qubit register")
         return value
 
@@ -386,11 +381,7 @@ class ConvertVisitor(QASMVisitor[State]):
         return context
 
     def visit_QubitDeclaration(self, node: ast.QubitDeclaration, context: State) -> State:
-        if not context.addressing_mode.set_virtual_mode():
-            raise_from_node(
-                node,
-                "Virtual qubit declared in physical addressing mode. Mixing modes not currently supported.",
-            )
+        context.addressing_mode.set_virtual_mode(node)
         name = node.qubit.name
         if node.size is None:
             bit = Qubit()
