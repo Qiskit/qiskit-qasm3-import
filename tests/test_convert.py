@@ -16,6 +16,8 @@ from qiskit.quantum_info import Operator
 
 from qiskit_qasm3_import import parse, ConversionError
 
+# pylint: disable=too-many-lines
+
 
 def test_readme_circuit():
     # No real test here as there's too much variance in the control-flow builders, and it's tricky
@@ -961,13 +963,17 @@ def test_reject_hardware_qubit_in_gate_body_2():
         parse(source)
 
 
-# pylint: disable=protected-access
-def _add_layout(circuit, hw_qubit_numbers):
+def _make_layout(hw_qubit_numbers):
     qr = QuantumRegister(len(hw_qubit_numbers), "qr")
-    circuit._layout = TranspileLayout(
+    return TranspileLayout(
         Layout.from_intlist(hw_qubit_numbers, qr),
         dict(zip(qr, hw_qubit_numbers)),
     )
+
+
+# pylint: disable=protected-access
+def _add_layout(circuit, hw_qubit_numbers):
+    circuit._layout = _make_layout(hw_qubit_numbers)
 
 
 # pylint: disable=protected-access
@@ -988,3 +994,48 @@ def test_layout_for_hardware_qubits():
     _add_layout(expected2, [0])
 
     assert qc._layout != expected2._layout
+
+
+def test_hardware_qubit_local_scope():
+    source = """
+    include "stdgates.inc";
+
+    bit[2] mid;
+
+    reset $100;
+    reset $101;
+    while (mid == "00") {
+        h $100;
+        h $101;
+        mid[0] = measure $100;
+        mid[1] = measure $101;
+     }
+    """
+
+    qc = parse(source)
+    layout = _make_layout([100, 101])
+    assert qc._layout == layout
+
+
+def test_hardware_qubit_nested_scope():
+    source = """
+    include "stdgates.inc";
+
+    bit[2] mid;
+
+    reset $100;
+    reset $101;
+
+    if (mid[0]) {
+        while (mid == "00") {
+            h $100;
+            h $101;
+            mid[0] = measure $100;
+            mid[1] = measure $101;
+         }
+    }
+    """
+
+    qc = parse(source)
+    layout = _make_layout([100, 101])
+    assert qc._layout == layout
