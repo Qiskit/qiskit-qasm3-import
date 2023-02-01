@@ -74,9 +74,6 @@ class ValueResolver(QASMVisitor):
     # pylint: disable=no-self-use
 
     def __init__(self, context: "State"):
-        # if not isinstance(context, 'State'):
-        #     raise(ValueError('bad'))
-        print(type(context))
         self.context = context
 
     def resolve(self, node: ast.Expression) -> Tuple[Any, types.Type]:
