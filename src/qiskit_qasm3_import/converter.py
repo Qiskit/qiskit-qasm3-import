@@ -36,7 +36,6 @@ from .expression import (
     ValueResolver,
     resolve_condition,
     is_physical,
-#    physical_qubit_identifiers_to_ints,
 )
 
 
@@ -315,7 +314,7 @@ class ConvertVisitor(QASMVisitor[State]):
         context.circuit._parameter_table[parameter] = ParameterReferences(())
 
     def _resolve_generic(self, node: ast.Expression, context: State) -> Tuple[Any, types.Type]:
-        return ValueResolver(context.symbol_table).resolve(node, context)
+        return ValueResolver(context).resolve(node)
 
     def _resolve_constant_int(self, node: ast.Expression, context: State) -> int:
         value, type = self._resolve_generic(node, context)

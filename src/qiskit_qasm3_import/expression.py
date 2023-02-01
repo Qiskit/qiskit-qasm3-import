@@ -69,58 +69,61 @@ class ValueResolver(QASMVisitor):
     These resolvers are intended to be short-lived.  Their instance state is the symbols that are
     available to them.  There is no per-run state tracked."""
 
-    __slots__ = ("symbols",)
+    __slots__ = ("context",)
 
     # pylint: disable=no-self-use
 
-    def __init__(self, symbols: Mapping[str, Symbol]):
-        self.symbols = symbols
+    def __init__(self, context: "State"):
+        # if not isinstance(context, 'State'):
+        #     raise(ValueError('bad'))
+        print(type(context))
+        self.context = context
 
-    def resolve(self, node: ast.Expression, context=None) -> Tuple[Any, types.Type]:
+    def resolve(self, node: ast.Expression) -> Tuple[Any, types.Type]:
         """The entry point to the resolver, resolving the AST node into a 2-tuple of a relevant
         Qiskit type, and the :class:`.Type` that it is an instance of."""
 
-        return self.visit(node, context)
+        return self.visit(node)
 
-    def visit(self, node: ast.QASMNode, context: None = None) -> Tuple[Any, types.Type]:
-        value, type = super().visit(node, context)
+    def visit(self, node: ast.QASMNode) -> Tuple[Any, types.Type]:
+        value, type = super().visit(node)
         if isinstance(type, types.Error):
             raise_from_node(node, "type error")
         return value, type
 
-    def generic_visit(self, node: ast.QASMNode, context: None = None):
+    def generic_visit(self, node: ast.QASMNode):
         raise_from_node(node, f"'{node.__class__.__name__}' cannot be resolved into a Qiskit value")
 
-    def visit_Identifier(self, node: ast.Identifier, context=None):
+    def visit_Identifier(self, node: ast.Identifier):
         name = node.name
-        if name not in self.symbols:
+        if name not in self.context.symbol_table:
             if is_physical(name):  # Physical qubits are not declared.
-                context.addressing_mode.set_physical_mode(node)
-                context.circuit.add_bits([bit := Qubit()])
+                self.context.addressing_mode.set_physical_mode(node)
+                self.context.circuit.add_bits([bit := Qubit()])
                 symbol = Symbol(name, bit, types.HardwareQubit(), Scope.GLOBAL, node)
-                self.symbols[name] = symbol
+                self.context.symbol_table[name] = symbol
             else:
                 raise_from_node(node, f"name '{name}' is not defined in this scope")
         else:
-            symbol = self.symbols[name]
+            symbol = self.context.symbol_table[name]
         return symbol.data, symbol.type
 
-    def visit_IntegerLiteral(self, node: ast.IntegerLiteral, _context=None):
+    def visit_IntegerLiteral(self, node: ast.IntegerLiteral):
         return node.value, types.Int(const=True)
 
-    def visit_FloatLiteral(self, node: ast.FloatLiteral, _context=None):
+    def visit_FloatLiteral(self, node: ast.FloatLiteral):
         return node.value, types.Float(const=True)
 
-    def visit_BooleanLiteral(self, node: ast.BooleanLiteral, _context=None):
+    def visit_BooleanLiteral(self, node: ast.BooleanLiteral):
         return node.value, types.Bool(const=True)
 
-    def visit_BitstringLiteral(self, node: ast.BitstringLiteral, _context=None):
+    def visit_BitstringLiteral(self, node: ast.BitstringLiteral):
         return node.value, types.Uint(const=True, size=node.width)
 
-    def visit_DurationLiteral(self, node: ast.DurationLiteral, _context=None):
+    def visit_DurationLiteral(self, node: ast.DurationLiteral):
         return (node.value, node.unit.name), types.Duration(const=True)
 
-    def visit_DiscreteSet(self, node: ast.DiscreteSet, _context=None):
+    def visit_DiscreteSet(self, node: ast.DiscreteSet):
         if not node.values:
             return (), types.Sequence(types.Never())
         set_type: _IntegerT = types.Never()
@@ -135,7 +138,7 @@ class ValueResolver(QASMVisitor):
             values.append(expr_value)
         return tuple(values), types.Sequence(set_type)
 
-    def visit_RangeDefinition(self, node: ast.RangeDefinition, _context=None):
+    def visit_RangeDefinition(self, node: ast.RangeDefinition):
         start, start_type = (None, types.Never()) if node.start is None else self.visit(node.start)
         end, end_type = (None, types.Never()) if node.end is None else self.visit(node.end)
         step, step_type = (None, types.Never()) if node.step is None else self.visit(node.step)
@@ -151,7 +154,7 @@ class ValueResolver(QASMVisitor):
             end = end + 1 if positive else end - 1
         return slice(start, end, step), types.Range(range_type)
 
-    def visit_Concatenation(self, node: ast.Concatenation, _context=None):
+    def visit_Concatenation(self, node: ast.Concatenation):
         lhs_value, lhs_type = self.visit(node.lhs)
         rhs_value, rhs_type = self.visit(node.rhs)
         if not (
@@ -164,7 +167,7 @@ class ValueResolver(QASMVisitor):
         out_value = tuple(lhs_value) + tuple(rhs_value)
         return out_value, type(lhs_type)(len(out_value))
 
-    def visit_UnaryExpression(self, node: ast.UnaryExpression, _context=None):
+    def visit_UnaryExpression(self, node: ast.UnaryExpression):
         # In all this, we're only supporting things that we can actually output; `~` for example is
         # supported on `Bit` and `BitArray`, but Qiskit doesn't have any representation of the
         # literals for those or the actual operation on `Clbit` / `ClassicalRegister`, so we can
@@ -179,7 +182,7 @@ class ValueResolver(QASMVisitor):
             return (-value), type
         raise_from_node(node, f"unhandled unary operator '{node.op.name}'")
 
-    def visit_BinaryExpression(self, node: ast.BinaryExpression, _context=None):
+    def visit_BinaryExpression(self, node: ast.BinaryExpression):
         if node.op.name not in ("+", "-", "*", "/"):
             raise_from_node(node, f"unsupported binary operation '{node.op.name}'")
         lhs_value, lhs_type = self.visit(node.lhs)
@@ -295,10 +298,10 @@ class ValueResolver(QASMVisitor):
             return value, (types.Bit() if isinstance(value, Clbit) else types.Qubit())
         raise_from_node(base, f"unsupported index type: '{index_type.pretty()}'")
 
-    def visit_IndexExpression(self, node: ast.IndexExpression, _context=None):
+    def visit_IndexExpression(self, node: ast.IndexExpression):
         return self._index_collection(*self.visit(node.collection), node.index, node)
 
-    def visit_IndexedIdentifier(self, node: ast.IndexedIdentifier, _context=None):
+    def visit_IndexedIdentifier(self, node: ast.IndexedIdentifier):
         collection, collection_type = self.visit(node.name)
         for index in node.indices:
             collection, collection_type = self._index_collection(
@@ -307,9 +310,8 @@ class ValueResolver(QASMVisitor):
         return collection, collection_type
 
 
-
 def resolve_condition(
-    node: ast.Expression, context: 'State'
+    node: ast.Expression, context: "State"
 ) -> Union[Tuple[Clbit, bool], Tuple[Iterable[Clbit], int]]:
     """A resolver for conditions that can be converted into Qiskit's very basic equality form
     of either ``Clbit == bool`` or ``ClassicalRegister == int``.
@@ -317,14 +319,13 @@ def resolve_condition(
     This effectively just handles very special outer cases, then delegates the rest of the work to a
     :class:`.ValueResolver`."""
 
-
-    value_resolver = ValueResolver(context.symbol_table)
+    value_resolver = ValueResolver(context)
 
     if isinstance(node, ast.BinaryExpression):
         if node.op not in (ast.BinaryOperator["=="], ast.BinaryOperator["!="]):
             raise_from_node(node, f"unhandled binary operator '{node.op.name}'")
-        lhs_value, lhs_type = value_resolver.visit(node.lhs, context)
-        rhs_value, rhs_type = value_resolver.visit(node.rhs, context)
+        lhs_value, lhs_type = value_resolver.visit(node.lhs)
+        rhs_value, rhs_type = value_resolver.visit(node.rhs)
         bad_type_message = (
             "conditions must be 'bit == const bool' or 'bitarray == const int',"
             f" not '{lhs_type.pretty()} {node.op.name} {rhs_type.pretty()}'"
@@ -351,11 +352,11 @@ def resolve_condition(
     if isinstance(node, ast.UnaryExpression):
         if node.op is not ast.UnaryOperator["~"]:
             raise_from_node(node, f"unhandled unary operator '{node.op.name}'")
-        value, type = value_resolver.visit(node.expression, context)
+        value, type = value_resolver.visit(node.expression)
         if isinstance(type, types.Bit):
             return (value, False)
     else:
-        value, type = value_resolver.visit(node, context)
+        value, type = value_resolver.visit(node)
         if isinstance(type, types.Bit):
             return (value, True)
     raise_from_node(
