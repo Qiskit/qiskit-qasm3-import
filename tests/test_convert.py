@@ -10,6 +10,8 @@ from qiskit.circuit import (
     Clbit,
     Qubit,
 )
+from qiskit.transpiler import Layout
+from qiskit.transpiler.layout import TranspileLayout
 from qiskit.quantum_info import Operator
 
 from qiskit_qasm3_import import parse, ConversionError
@@ -932,3 +934,57 @@ def test_reject_mixed_addressing_mode_virtual_register():
     """
     with pytest.raises(ConversionError, match="Virtual qubit declared in physical addressing mode"):
         parse(source)
+
+
+def test_reject_hardware_qubit_in_gate_body_1():
+    source = """
+        include 'stdgates.inc';
+
+        gate my_gate q {
+           h $0;
+        }
+    """
+    with pytest.raises(ConversionError, match="hardware qubits not allowed in gate definitions"):
+        parse(source)
+
+
+def test_reject_hardware_qubit_in_gate_body_2():
+    source = """
+        include 'stdgates.inc';
+
+        h $0;
+        gate my_gate q {
+           h $0;
+        }
+    """
+    with pytest.raises(ConversionError, match="hardware qubits not allowed in gate definitions"):
+        parse(source)
+
+
+# pylint: disable=protected-access
+def _add_layout(circuit, hw_qubit_numbers):
+    qr = QuantumRegister(len(hw_qubit_numbers), "qr")
+    circuit._layout = TranspileLayout(
+        Layout.from_intlist(hw_qubit_numbers, qr),
+        dict(zip(qr, hw_qubit_numbers)),
+    )
+
+
+# pylint: disable=protected-access
+def test_layout_for_hardware_qubits():
+    source = """
+        reset $99;
+    """
+    qc = parse(source)
+    expected = QuantumCircuit([Qubit()])
+    expected.reset(0)
+    _add_layout(expected, [99])
+
+    assert qc == expected
+    assert qc._layout == expected._layout
+
+    expected2 = QuantumCircuit([Qubit()])
+    expected2.reset(0)
+    _add_layout(expected2, [0])
+
+    assert qc._layout != expected2._layout

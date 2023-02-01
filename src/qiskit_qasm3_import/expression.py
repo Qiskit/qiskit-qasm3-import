@@ -97,6 +97,11 @@ class ValueResolver(QASMVisitor):
         name = node.name
         if name not in self.context.symbol_table:
             if is_physical(name):  # Physical qubits are not declared.
+                if self.context.scope == Scope.GATE:
+                    raise_from_node(
+                        node,
+                        f"Illegal qubit reference '{name}'. References to hardware qubits not allowed in gate definitions.",
+                    )
                 self.context.addressing_mode.set_physical_mode(node)
                 self.context.circuit.add_bits([bit := Qubit()])
                 symbol = Symbol(name, bit, types.HardwareQubit(), Scope.GLOBAL, node)
