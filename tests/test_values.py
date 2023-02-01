@@ -10,10 +10,12 @@ from qiskit_qasm3_import.data import Symbol, Scope
 from qiskit_qasm3_import.converter import State
 from qiskit_qasm3_import.expression import ValueResolver
 
+
 def _make_context(symbols):
     context = State(Scope.GLOBAL)
     context.symbol_table = symbols
     return context
+
 
 @pytest.mark.parametrize(
     ("node", "type"),

@@ -18,7 +18,7 @@ scope, rather than trying to build a whole new internal IR to handle everything 
 __all__ = ["ValueResolver", "resolve_condition"]
 
 import re
-from typing import Any, Iterable, Mapping, Tuple, Union
+from typing import Any, Iterable, Tuple, Union
 
 from openqasm3 import ast
 from openqasm3.visitor import QASMVisitor
@@ -82,12 +82,14 @@ class ValueResolver(QASMVisitor):
 
         return self.visit(node)
 
+    # pylint: disable=arguments-differ
     def visit(self, node: ast.QASMNode) -> Tuple[Any, types.Type]:
         value, type = super().visit(node)
         if isinstance(type, types.Error):
             raise_from_node(node, "type error")
         return value, type
 
+    # pylint: disable=arguments-differ
     def generic_visit(self, node: ast.QASMNode):
         raise_from_node(node, f"'{node.__class__.__name__}' cannot be resolved into a Qiskit value")
 

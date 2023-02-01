@@ -35,7 +35,6 @@ from .exceptions import ConversionError, raise_from_node
 from .expression import (
     ValueResolver,
     resolve_condition,
-    is_physical,
 )
 
 
