@@ -40,9 +40,9 @@ def is_physical(name: str):
 
 
 # Qiskit represents physical qubits in a layout by integers.
-def physical_qubit_identifiers_to_ints(names):
-    """Convert an iterable of identifiers of physical qubits to a list of corresponding `int`s."""
-    return [int(name[1:]) for name in names]
+# def physical_qubit_identifiers_to_ints(names):
+#     """Convert an iterable of identifiers of physical qubits to a list of corresponding `int`s."""
+#     return [int(name[1:]) for name in names]
 
 
 def join_integer_types(left: _IntegerT, right: _IntegerT) -> _IntegerT:

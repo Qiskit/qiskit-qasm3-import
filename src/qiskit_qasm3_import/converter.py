@@ -36,7 +36,7 @@ from .expression import (
     ValueResolver,
     resolve_condition,
     is_physical,
-    physical_qubit_identifiers_to_ints,
+#    physical_qubit_identifiers_to_ints,
 )
 
 
@@ -101,19 +101,26 @@ class AddressingMode:
     This class is useful as long as we allow only physical or virtual addressing modes, but
     not mixed. If the latter is supported in the future, this class will be modified or removed.
     """
+
     def __init__(self):
-        self._state = 0 # 0 == UNKNOWN, 1 == PHYSICAL, 2 == VIRTUAL
+        self._state = 0  # 0 == UNKNOWN, 1 == PHYSICAL, 2 == VIRTUAL
 
     def set_physical_mode(self, node):
         """Set the addressing mode to physical. On success return `True`, otherwise `False`."""
         if self._state == 2:
-            raise_from_node(node, "Physical qubit referenced in virtual addressing mode. Mixing modes not currently supported.")
+            raise_from_node(
+                node,
+                "Physical qubit referenced in virtual addressing mode. Mixing modes not currently supported.",
+            )
         self._state = 1
 
     def set_virtual_mode(self, node):
         """Set the addressing mode to virtual. On success return `True`, otherwise `False`."""
         if self._state == 1:
-            raise_from_node(node, "Virtual qubit declared in physical addressing mode. Mixing modes not currently supported.")
+            raise_from_node(
+                node,
+                "Virtual qubit declared in physical addressing mode. Mixing modes not currently supported.",
+            )
         self._state = 2
 
 
@@ -200,8 +207,6 @@ class GateBuilder:
         return out
 
 
-
-
 class ConvertVisitor(QASMVisitor[State]):
     """Internal visitor of an OpenQASM 3 AST to convert it to a
     :class:`~qiskit.circuit.QuantumCircuit`.  The complete conversion is done by calling
@@ -223,14 +228,17 @@ class ConvertVisitor(QASMVisitor[State]):
         This is used to generated improved error messages."""
 
         state = self.visit(node, State(Scope.GLOBAL, source))
-        symbols = state.symbol_table
-        if any(isinstance(type, types.HardwareQubit) for type in symbols.values()):
-            names = filter(is_physical, symbols.keys())
-            intlist = physical_qubit_identifiers_to_ints(names)
-            qr = QuantumRegister(len(intlist), "qr")
-            initial_layout = Layout.from_intlist(intlist, qr)
-            input_qubit_mapping = dict(zip(qr, intlist))
-            state.circuit._layout = TranspileLayout(initial_layout, input_qubit_mapping)
+        hardware_qubit_numbers = [
+            int(sym.name[1:])
+            for sym in state.symbol_table.values()
+            if isinstance(sym.type, types.HardwareQubit)
+        ]
+        if len(hardware_qubit_numbers) > 0:
+            qr = QuantumRegister(len(hardware_qubit_numbers), "qr")
+            state.circuit._layout = TranspileLayout(
+                Layout.from_intlist(hardware_qubit_numbers, qr),
+                dict(zip(qr, hardware_qubit_numbers)),
+            )
         return state.circuit
 
     def _raise_previously_defined(self, new: Symbol, old: Symbol, node: ast.QASMNode) -> NoReturn:
