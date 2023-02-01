@@ -79,8 +79,7 @@ class ValueResolver(QASMVisitor):
     def resolve(self, node: ast.Expression, context=None) -> Tuple[Any, types.Type]:
         """The entry point to the resolver, resolving the AST node into a 2-tuple of a relevant
         Qiskit type, and the :class:`.Type` that it is an instance of."""
-        if context is None:
-            return self.visit(node)
+
         return self.visit(node, context)
 
     def visit(self, node: ast.QASMNode, context: None = None) -> Tuple[Any, types.Type]:
@@ -308,8 +307,9 @@ class ValueResolver(QASMVisitor):
         return collection, collection_type
 
 
+
 def resolve_condition(
-    node: ast.Expression, context=None  # symbols: Mapping[str, Symbol]
+    node: ast.Expression, context: 'State'
 ) -> Union[Tuple[Clbit, bool], Tuple[Iterable[Clbit], int]]:
     """A resolver for conditions that can be converted into Qiskit's very basic equality form
     of either ``Clbit == bool`` or ``ClassicalRegister == int``.
@@ -317,13 +317,8 @@ def resolve_condition(
     This effectively just handles very special outer cases, then delegates the rest of the work to a
     :class:`.ValueResolver`."""
 
-    if isinstance(context, dict):
-        symbols = context
-        context = None
-    else:
-        symbols = context.symbol_table
 
-    value_resolver = ValueResolver(symbols)
+    value_resolver = ValueResolver(context.symbol_table)
 
     if isinstance(node, ast.BinaryExpression):
         if node.op not in (ast.BinaryOperator["=="], ast.BinaryOperator["!="]):
