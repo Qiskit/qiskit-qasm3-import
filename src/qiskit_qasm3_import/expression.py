@@ -27,7 +27,7 @@ from qiskit.circuit import Clbit, Qubit
 from . import types
 from .exceptions import raise_from_node
 from .data import Symbol, Scope
-from .converter import State
+from .state import State
 
 
 _IntegerT = Union[types.Never, types.Int, types.Uint]
