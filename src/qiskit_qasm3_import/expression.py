@@ -27,6 +27,7 @@ from qiskit.circuit import Clbit, Qubit
 from . import types
 from .exceptions import raise_from_node
 from .data import Symbol, Scope
+from .converter import State
 
 
 _IntegerT = Union[types.Never, types.Int, types.Uint]
@@ -67,7 +68,7 @@ class ValueResolver(QASMVisitor):
 
     # pylint: disable=no-self-use
 
-    def __init__(self, context: "State"):
+    def __init__(self, context: State):
         self.context = context
 
     def resolve(self, node: ast.Expression) -> Tuple[Any, types.Type]:
@@ -309,7 +310,7 @@ class ValueResolver(QASMVisitor):
 
 
 def resolve_condition(
-    node: ast.Expression, context: "State"
+    node: ast.Expression, context: State
 ) -> Union[Tuple[Clbit, bool], Tuple[Iterable[Clbit], int]]:
     """A resolver for conditions that can be converted into Qiskit's very basic equality form
     of either ``Clbit == bool`` or ``ClassicalRegister == int``.
