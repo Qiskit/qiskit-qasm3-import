@@ -160,7 +160,9 @@ class State:
         out.source = self.source
         out.circuit = self.circuit  # No copy; we want to keep modifying this one.
         out.symbol_table = self.symbol_table.copy()
+        out.addressing_mode = self.addressing_mode
         out._unique = self._unique
+
         return out
 
     def unique_name(self, prefix=""):
@@ -218,7 +220,7 @@ class ConvertVisitor(QASMVisitor[State]):
     # In some places, such as symbol definitions, we do some simple checks to help everyone's
     # sanity, as the reference package doesn't yet do this.
 
-    # pylint: disable=missing-function-docstring,no-self-use,unused-argument,protected-access
+    # pylint: disable=missing-function-docstring,no-self-use,unused-argument
 
     def convert(self, node: ast.Program, *, source: Optional[str] = None) -> QuantumCircuit:
         """Convert a program node into a :class:`~qiskit.circuit.QuantumCircuit`.  If given,
@@ -233,7 +235,7 @@ class ConvertVisitor(QASMVisitor[State]):
         ]
         if len(hardware_qubit_numbers) > 0:
             qr = QuantumRegister(len(hardware_qubit_numbers), "qr")
-            state.circuit._layout = TranspileLayout(
+            state.circuit._layout = TranspileLayout(  # pylint: disable=protected-access
                 Layout.from_intlist(hardware_qubit_numbers, qr),
                 dict(zip(qr, hardware_qubit_numbers)),
             )

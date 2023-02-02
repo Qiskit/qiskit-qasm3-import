@@ -1039,3 +1039,21 @@ def test_hardware_qubit_nested_scope():
     qc = parse(source)
     layout = _make_layout([100, 101])
     assert qc._layout == layout
+
+
+def test_hardware_qubit_first_seen_in_local_scope_broken():
+    source = """
+    include "stdgates.inc";
+
+    bit[2] mid;
+
+    while (mid == "00") {
+        h $100;
+        h $101;
+        mid[0] = measure $100;
+        mid[1] = measure $101;
+     }
+    """
+
+    qc = parse(source)
+    assert qc._layout is None
