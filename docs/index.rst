@@ -91,6 +91,7 @@ objects, and some are types used during inference or to represent errors.
 .. autoclass:: BitArray
 .. autoclass:: Qubit
 .. autoclass:: QubitArray
+.. autoclass:: HardwareQubit
 .. autoclass:: Bool
 .. autoclass:: Int
 .. autoclass:: Uint

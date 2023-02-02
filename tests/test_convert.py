@@ -16,8 +16,6 @@ from qiskit.quantum_info import Operator
 
 from qiskit_qasm3_import import parse, ConversionError
 
-# pylint: disable=too-many-lines
-
 
 def test_readme_circuit():
     # No real test here as there's too much variance in the control-flow builders, and it's tricky

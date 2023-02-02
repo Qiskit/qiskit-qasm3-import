@@ -5,6 +5,7 @@ import math
 import re
 import string
 import sys
+import enum
 
 if sys.version_info < (3, 9):
     from typing import Iterator, Sequence
@@ -100,26 +101,29 @@ class AddressingMode:
     not mixed. If the latter is supported in the future, this class will be modified or removed.
     """
 
+    _Mode = enum.Enum("_Mode", ["UNKNOWN", "PHYSICAL", "VIRTUAL"])
+    (UNKNOWN, PHYSICAL, VIRTUAL) = (_Mode.UNKNOWN, _Mode.PHYSICAL, _Mode.VIRTUAL)
+
     def __init__(self):
-        self._state = 0  # 0 == UNKNOWN, 1 == PHYSICAL, 2 == VIRTUAL
+        self._state = self.UNKNOWN
 
     def set_physical_mode(self, node):
         """Set the addressing mode to physical. On success return `True`, otherwise `False`."""
-        if self._state == 2:
+        if self._state == self.VIRTUAL:
             raise_from_node(
                 node,
                 "Physical qubit referenced in virtual addressing mode. Mixing modes not currently supported.",
             )
-        self._state = 1
+        self._state = self.PHYSICAL
 
     def set_virtual_mode(self, node):
         """Set the addressing mode to virtual. On success return `True`, otherwise `False`."""
-        if self._state == 1:
+        if self._state == self.PHYSICAL:
             raise_from_node(
                 node,
                 "Virtual qubit declared in physical addressing mode. Mixing modes not currently supported.",
             )
-        self._state = 2
+        self._state = self.VIRTUAL
 
 
 class State:
