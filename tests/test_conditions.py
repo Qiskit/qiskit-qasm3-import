@@ -95,10 +95,9 @@ def test_incorrect_binary_operator():
         resolve_condition(node, context)
 
 
-# TODO: Fix and reinstate this test.
-# def test_reject_nonbit_condition():
-#     with pytest.raises(ConversionError, match="conditions must be"):
-#         resolve_condition(ast.BooleanLiteral(True), {})
+def test_reject_nonbit_condition():
+    with pytest.raises(ConversionError, match="conditions must be"):
+        resolve_condition(ast.BooleanLiteral(True), _make_context({}))
 
 
 def test_index_to_bit():
