@@ -1,18 +1,9 @@
 import enum
-from typing import Any, Callable, List, NoReturn, Optional, Tuple, Union
+from typing import Optional
 import itertools
 import math
 
-from qiskit.circuit import (
-    ClassicalRegister,
-    Clbit,
-    Gate,
-    Parameter,
-    ParameterExpression,
-    QuantumCircuit,
-    QuantumRegister,
-    Qubit,
-)
+from qiskit.circuit import QuantumCircuit
 
 from qiskit.circuit.library import standard_gates as _std
 
@@ -73,6 +64,7 @@ _BUILTINS = {
     "euler": Symbol("euler", math.e, types.Float(const=True), Scope.BUILTIN),
     "ℇ": Symbol("ℇ", math.e, types.Float(const=True), Scope.BUILTIN),
 }
+
 
 class AddressingMode:
     """Addressing mode for qubits in OpenQASM 3 programs.

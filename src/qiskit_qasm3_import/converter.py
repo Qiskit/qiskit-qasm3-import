@@ -1,7 +1,5 @@
 __all__ = ["ConvertVisitor"]
 
-import itertools
-import math
 import re
 import string
 import sys
@@ -25,7 +23,6 @@ from qiskit.circuit import (
     Qubit,
 )
 from qiskit.circuit.parametertable import ParameterReferences
-from qiskit.circuit.library import standard_gates as _std
 from qiskit.transpiler import Layout
 from qiskit.transpiler.layout import TranspileLayout
 
@@ -38,8 +35,6 @@ from .expression import (
 )
 
 from .state import State, _STDGATES
-
-
 
 
 _QASM2_IDENTIFIER = re.compile(r"[a-z]\w*", flags=re.ASCII)
