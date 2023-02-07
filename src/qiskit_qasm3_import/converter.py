@@ -203,8 +203,8 @@ class ConvertVisitor(QASMVisitor[State]):
     def _resolve_angle(
         self, node: ast.Expression, context: State
     ) -> Union[float, ParameterExpression]:
-        value, type = self._resolve_generic(node, context)
-        if not isinstance(type, (types.Int, types.Uint, types.Angle, types.Float)):
+        value, _type = self._resolve_generic(node, context)
+        if not isinstance(_type, (types.Int, types.Uint, types.Angle, types.Float)):
             raise_from_node(node, "required an angle-like value")
         return value
 

@@ -90,7 +90,6 @@ class ValueResolver(QASMVisitor):
 
     def visit_Identifier(self, node: ast.Identifier):
         name = node.name
-        does_exist = self.context.symbol_table.exists(name)
         if not self.context.symbol_table.exists(name):
             if is_physical(name):  # Physical qubits are not declared.
                 if self.context.scope == Scope.GATE:

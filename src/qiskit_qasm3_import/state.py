@@ -138,7 +138,8 @@ class SymbolTable:
         return name in self.builtin_table or name in self.global_table or name in self.local_table
 
     def get(self, name: str):
-        for table in (self.builtin_table, self.global_table, self.local_table):
+        # Search order determines which symbols can shadow others.
+        for table in (self.local_table, self.global_table, self.builtin_table):
             if (symbol := table.get(name)):
                 return symbol
         return None
