@@ -94,7 +94,7 @@ class ConvertVisitor(QASMVisitor[State]):
 
         state = self.visit(node, State(Scope.GLOBAL, source))
         hardware_qubit_numbers = [
-            int(sym.name[1:])
+            int(sym.name[1:]) # Omit the leading `$`.
             for sym in state.symbol_table.values()
             if isinstance(sym.type, types.HardwareQubit)
         ]
