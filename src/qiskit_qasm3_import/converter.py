@@ -95,7 +95,7 @@ class ConvertVisitor(QASMVisitor[State]):
         state = self.visit(node, State(Scope.GLOBAL, source))
         hardware_qubit_numbers = [
             int(sym.name[1:]) # Omit the leading `$`.
-            for sym in state.symbol_table.values()
+            for sym in state.symbol_table.global_symbols()
             if isinstance(sym.type, types.HardwareQubit)
         ]
         if len(hardware_qubit_numbers) > 0:
@@ -127,7 +127,7 @@ class ConvertVisitor(QASMVisitor[State]):
         symbol = Symbol(name, definition, type, Scope.GLOBAL, definer)
         if (previous := context.symbol_table.get(name)) is not None:
             self._raise_previously_defined(symbol, previous, definer)
-        context.symbol_table[name] = symbol
+        context.symbol_table.insert(symbol)
         return context
 
     def _apply_gate_modifier(
@@ -232,7 +232,7 @@ class ConvertVisitor(QASMVisitor[State]):
             name = context.unique_name()
             lhs = ClassicalRegister(name=_escape_qasm2(name), bits=lhs)
             context.circuit.add_register(lhs)
-            context.symbol_table[name] = Symbol(name, lhs, types.BitArray, Scope.NONE)
+            context.symbol_table.insert(Symbol(name, lhs, types.BitArray, Scope.NONE))
         return (lhs, rhs)
 
     # Everything below is the implementation of the visitor itself.  The general `visit` method is
@@ -265,21 +265,21 @@ class ConvertVisitor(QASMVisitor[State]):
             register = QuantumRegister(size, name=_escape_qasm2(name))
             context.circuit.add_register(register)
             symbol = Symbol(name, register, types.QubitArray(size), Scope.GLOBAL, node)
-        context.symbol_table[name] = symbol
+        context.symbol_table.insert(symbol)
         return context
 
     def visit_QuantumGateDefinition(self, node: ast.QuantumGateDefinition, context: State) -> State:
         inner = context.gate_scope()
         parameters = [Parameter(name.name) for name in node.arguments]
         for parameter in parameters:
-            inner.symbol_table[parameter.name] = Symbol(
-                parameter.name, parameter, types.Angle(), Scope.GATE, node
-            )
+            inner.symbol_table.insert(Symbol(
+                parameter.name, parameter, types.Angle(), Scope.GATE, node)
+                                      )
             self._add_circuit_parameter(parameter, inner)
         bits = [Qubit() for _ in node.qubits]
         inner.circuit.add_bits(bits)
         for name, bit in zip(node.qubits, bits):
-            inner.symbol_table[name.name] = Symbol(name.name, bit, types.Qubit(), Scope.GATE, node)
+            inner.symbol_table.insert(Symbol(name.name, bit, types.Qubit(), Scope.GATE, node))
         for statement in node.body:
             inner = self.visit(statement, inner)
         return self._define_gate(
@@ -363,7 +363,7 @@ class ConvertVisitor(QASMVisitor[State]):
             register = ClassicalRegister(size, name=_escape_qasm2(name))
             context.circuit.add_register(register)
             symbol = Symbol(name, register, types.BitArray(size), context.scope, node)
-        context.symbol_table[name] = symbol
+        context.symbol_table.insert(symbol)
         if node.init_expression is not None:
             if not isinstance(node.init_expression, ast.QuantumMeasurement):
                 raise_from_node(
@@ -396,7 +396,7 @@ class ConvertVisitor(QASMVisitor[State]):
         name = node.identifier.name
         parameter = Parameter(name)
         symbol = Symbol(name, parameter, type, Scope.GLOBAL, node)
-        context.symbol_table[name] = symbol
+        context.symbol_table.insert(symbol)
         self._add_circuit_parameter(parameter, context)
         return context
 
@@ -452,7 +452,7 @@ class ConvertVisitor(QASMVisitor[State]):
             inner = context.local_scope()
             name = node.identifier.name
             symbol = Symbol(name, parameter, var_type, Scope.LOCAL, node)
-            inner.symbol_table[name] = symbol
+            inner.symbol_table.insert(symbol)
             self._add_circuit_parameter(parameter, inner)
             for statement in node.block:
                 inner = self.visit(statement, inner)
@@ -483,5 +483,5 @@ class ConvertVisitor(QASMVisitor[State]):
                 f"aliases must be of registers of either clbits or qubits, not '{type.pretty()}'",
             )
         context.circuit.add_register(register)
-        context.symbol_table[name] = Symbol(name, register, type, context.scope, node)
+        context.symbol_table.insert(Symbol(name, register, type, context.scope, node))
         return context

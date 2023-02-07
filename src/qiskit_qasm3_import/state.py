@@ -98,6 +98,56 @@ class AddressingMode:
         self._state = self.VIRTUAL
 
 
+class SymbolTable:
+    __slots__ = ("local_table", "global_table", "builtin_table")
+
+    def __init__(self):
+        self.global_table = {}
+        self.builtin_table = _BUILTINS.copy()
+        self.local_table = {} # For everything else
+
+    def gate_scope_copy(self):
+        out = SymbolTable.__new__(SymbolTable)
+        out.local_table = {}
+        out.builtin_table = self.builtin_table
+        out.global_table = {}
+        for name, item in self.global_table.items():
+            if (isinstance(item.type, types.Gate) or
+                isinstance(
+                    item.type, (types.Int, types.Uint, types.Float, types.Angle, types.Duration)
+                )
+                and item.type.const):
+                out.global_table[name] = item  # TODO: use insert
+        return out
+
+    def local_scope_copy(self):
+        out = SymbolTable.__new__(SymbolTable)
+        out.local_table = self.local_table.copy()
+        out.global_table = self.global_table
+        out.builtin_table = self.builtin_table
+
+        return out
+
+    def insert(self, symbol: Symbol): # This does not catch shadowing builtins
+        if symbol.scope == Scope.GLOBAL:
+            self.global_table[symbol.name] = symbol
+        else:
+            self.local_table[symbol.name] = symbol
+
+    def exists(self, name: str):
+        return name in self.builtin_table or name in self.global_table or name in self.local_table
+
+    def get(self, name: str):
+        for table in (self.builtin_table, self.global_table, self.local_table):
+            if (symbol := table.get(name)):
+                return symbol
+        return None
+#        raise KeyError(f"Symbol {name} not found.")  # TODO: remove this if we decide against raising
+
+    def global_symbols(self):
+        return self.global_table.values()
+
+
 class State:
     __slots__ = ("scope", "source", "circuit", "symbol_table", "_unique", "addressing_mode")
 
@@ -105,7 +155,7 @@ class State:
         self.scope = scope
         self.source = source
         self.circuit = QuantumCircuit()
-        self.symbol_table = _BUILTINS.copy()
+        self.symbol_table = SymbolTable()
         self._unique = (f"_{x}" for x in itertools.count())
         self.addressing_mode = AddressingMode()
 
@@ -114,18 +164,8 @@ class State:
         # We use the entire source, because at the moment, that's what all the error messages
         # expect; the nodes have references to the complete source in their spans.
         out = State(Scope.GATE, self.source)
-        for name, item in self.symbol_table.items():
-            if (item.scope is Scope.BUILTIN) or (
-                item.scope is Scope.GLOBAL
-                and (
-                    isinstance(item.type, types.Gate)
-                    or isinstance(
-                        item.type, (types.Int, types.Uint, types.Float, types.Angle, types.Duration)
-                    )
-                    and item.type.const
-                )
-            ):
-                out.symbol_table[name] = item
+        out.symbol_table = self.symbol_table.gate_scope_copy() # A bit inefficient
+
         return out
 
     def local_scope(self):
@@ -135,7 +175,7 @@ class State:
         out.scope = Scope.LOCAL
         out.source = self.source
         out.circuit = self.circuit  # No copy; we want to keep modifying this one.
-        out.symbol_table = self.symbol_table.copy()
+        out.symbol_table = self.symbol_table.local_scope_copy()
         out.addressing_mode = self.addressing_mode
         out._unique = self._unique
 
@@ -143,6 +183,6 @@ class State:
 
     def unique_name(self, prefix=""):
         """Get a name that is not defined in the current scope."""
-        while (name := f"{prefix}{next(self._unique)}") in self.symbol_table:
+        while (name := f"{prefix}{next(self._unique)}") in self.symbol_table.local_table: # Not using an API
             pass
         return name
