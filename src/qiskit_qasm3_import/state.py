@@ -1,5 +1,5 @@
 import enum
-from typing import Optional
+from typing import Optional, Union, List
 import itertools
 import math
 
@@ -107,6 +107,13 @@ class SymbolTable:
         self.local_table = {}  # For everything else
 
     def gate_scope_copy(self):
+        """Return a copy of the symbol table for use in the lexical scope of a gate definition.
+
+        Gates from surrounding scopes will be visibile. (i.e. are copied) Most constant symbols bound to
+        numerical values in surrounding scopes will be visible. Builtin symbols will be visible. All
+        other symbols will not be visible in the gate scope. In particular, no symbols in surrounding
+        local scopes will be visible.
+        """
         out = SymbolTable.__new__(SymbolTable)
         out.local_table = {}
         out.builtin_table = self.builtin_table
@@ -123,6 +130,12 @@ class SymbolTable:
         return out
 
     def local_scope_copy(self):
+        """Return a copy of the symbol table for use with a new local scope.
+
+        The data for globals and builtins are copied as references so that mutating
+        them in the copy does the same mutation in the parent. The data for locals
+        is a proper copy, not a reference. So mutating it has no effect on the parent.
+        """
         out = SymbolTable.__new__(SymbolTable)
         out.local_table = self.local_table.copy()
         out.global_table = self.global_table
@@ -130,7 +143,8 @@ class SymbolTable:
 
         return out
 
-    def insert(self, symbol):
+    def insert(self, symbol: Union[List, Symbol]):
+        """Insert a `Symbol` (or each of a list thereof) into the symbol table."""
         if isinstance(symbol, list):
             for sym in symbol:
                 self._insert(sym)
@@ -144,9 +158,11 @@ class SymbolTable:
             self.local_table[symbol.name] = symbol
 
     def __contains__(self, name: str):
+        # Return `True` if `name` is in symbol table.
         return name in self.builtin_table or name in self.global_table or name in self.local_table
 
     def __getitem__(self, name: str):
+        # An opaque interface for looking up `name` in the symbol table.
         for table in (self.local_table, self.global_table, self.builtin_table):
             if symbol := table.get(name):
                 return symbol
@@ -155,14 +171,18 @@ class SymbolTable:
         )  # TODO: remove this if we decide against raising
 
     def get(self, name: str):
+        """Return `Symbol` corresponding to `name`, or `None` if none exists."""
         # Search order determines which symbols can shadow others.
         for table in (self.local_table, self.global_table, self.builtin_table):
             if symbol := table.get(name):
                 return symbol
         return None
 
-    def global_symbols(self):
-        return self.global_table.values()
+    def hardware_qubits(self):
+        """Return an iterator over the `Symbol`s referring to hardware qubits."""
+        return (
+            sym for sym in self.global_table.values() if isinstance(sym.type, types.HardwareQubit)
+        )
 
 
 class State:

@@ -93,11 +93,7 @@ class ConvertVisitor(QASMVisitor[State]):
         This is used to generated improved error messages."""
 
         state = self.visit(node, State(Scope.GLOBAL, source))
-        hardware_qubit_numbers = [
-            int(sym.name[1:])  # Omit the leading `$`.
-            for sym in state.symbol_table.global_symbols()
-            if isinstance(sym.type, types.HardwareQubit)
-        ]
+        hardware_qubit_numbers = [int(sym.name[1:]) for sym in state.symbol_table.hardware_qubits()]
         if len(hardware_qubit_numbers) > 0:
             qr = QuantumRegister(len(hardware_qubit_numbers), "qr")
             state.circuit._layout = TranspileLayout(  # pylint: disable=protected-access

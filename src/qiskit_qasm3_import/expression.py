@@ -104,7 +104,7 @@ class ValueResolver(QASMVisitor):
             else:
                 raise_from_node(node, f"name '{name}' is not defined in this scope")
         else:
-            symbol = self.context.symbol_table.get(name)
+            symbol = self.context.symbol_table[name]
         return symbol.data, symbol.type
 
     def visit_IntegerLiteral(self, node: ast.IntegerLiteral):
