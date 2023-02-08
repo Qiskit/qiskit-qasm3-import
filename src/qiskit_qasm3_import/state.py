@@ -176,7 +176,7 @@ class SymbolTable:
                 return symbol
         raise KeyError(
             f"Symbol {name} not found."
-        )  # TODO: remove this if we decide against raising
+        )
 
     def get(self, name: str):
         """Return `Symbol` corresponding to `name`, or `None` if none exists."""
