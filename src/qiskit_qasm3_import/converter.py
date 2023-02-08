@@ -88,9 +88,13 @@ class ConvertVisitor(QASMVisitor[State]):
     # pylint: disable=missing-function-docstring,no-self-use,unused-argument
 
     def convert(self, node: ast.Program, *, source: Optional[str] = None) -> QuantumCircuit:
-        """Convert a program node into a :class:`~qiskit.circuit.QuantumCircuit`.  If given,
-        `source` is a string containing the OpenQASM 3 source code that was parsed into `node`.
-        This is used to generated improved error messages."""
+        """Convert a program node into a :class:`~qiskit.circuit.QuantumCircuit`.
+
+        If given, `source` is a string containing the OpenQASM 3 source code that was parsed into `node`.
+        This is used to generated improved error messages. A :class:`.State` containing
+        information about the conversion is returned. The :class:`~qiskit.circuit.QuantumCircuit` is
+        stored in property thereof named `circuit`.
+        """
 
         state = self.visit(node, State(Scope.GLOBAL, source))
         # A hardware-qubit symbol has the form '$' followed by digits. We keep only the digits.
@@ -102,7 +106,7 @@ class ConvertVisitor(QASMVisitor[State]):
                 Layout.from_intlist(hardware_qubit_numbers, qr),
                 dict(zip(qr, hardware_qubit_numbers)),
             )
-        return state.circuit
+        return state
 
     def _raise_previously_defined(self, new: Symbol, old: Symbol, node: ast.QASMNode) -> NoReturn:
         message = f"'{new.name}' is already defined."
