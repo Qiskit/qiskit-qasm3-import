@@ -61,8 +61,9 @@ class ValueResolver(QASMVisitor):
     here should resolve into a single Qiskit object (or occasionally a compound of such objects,
     like lists of bits).
 
-    These resolvers are intended to be short-lived.  Their instance state is the symbols that are
-    available to them.  There is no per-run state tracked."""
+    These resolvers are intended to be short-lived. Their instance state is the instance of
+    :class:`.State` created in :method:`.ConvertVisitor.convert`.
+    """
 
     __slots__ = ("context",)
 
