@@ -93,9 +93,11 @@ class ConvertVisitor(QASMVisitor[State]):
         This is used to generated improved error messages."""
 
         state = self.visit(node, State(Scope.GLOBAL, source))
+        # A hardware-qubit symbol has the form '$' followed by digits. We keep only the digits.
         hardware_qubit_numbers = [int(sym.name[1:]) for sym in state.symbol_table.hardware_qubits()]
-        if len(hardware_qubit_numbers) > 0:
-            qr = QuantumRegister(len(hardware_qubit_numbers), "qr")
+        if (num_qubits := len(hardware_qubit_numbers)) > 0:
+            qr = QuantumRegister(num_qubits, "qr")
+            # TODO: When access to _layout is added to terra, use the API.
             state.circuit._layout = TranspileLayout(  # pylint: disable=protected-access
                 Layout.from_intlist(hardware_qubit_numbers, qr),
                 dict(zip(qr, hardware_qubit_numbers)),
