@@ -324,6 +324,40 @@ def test_basic_gate_definition():
     assert qc.data[0].operation.definition == expected
 
 
+def test_parameter_shadows_global_1():
+    source = """
+        include 'stdgates.inc';
+
+        qubit q;
+
+        gate my_gate(p) q0 {
+            U(0, p, 0) q0;
+        }
+
+        my_gate(4.5) q;
+    """
+    qc = parse(source)
+
+    expected = QuantumCircuit([Qubit()])
+    expected.u(0, 4.5, 0, 0)
+    assert qc.data[0].operation.definition == expected
+
+
+def test_parameter_shadows_global_2():
+    source = """
+        include 'stdgates.inc';
+
+        qubit q;
+
+        gate my_gate(p) q0 {
+            U(0, p, 0) q0;
+            p q0;
+        }
+    """
+    with pytest.raises(ConversionError, match="not a gate"):
+        parse(source)
+
+
 def test_parametrised_gate_definition():
     source = """
         include 'stdgates.inc';
