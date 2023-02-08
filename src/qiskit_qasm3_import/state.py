@@ -109,10 +109,9 @@ class SymbolTable:
     def gate_scope_copy(self):
         """Return a copy of the symbol table for use in the lexical scope of a gate definition.
 
-        Gates from surrounding scopes will be visibile. (i.e. are copied) Most constant symbols bound to
-        numerical values in surrounding scopes will be visible. Builtin symbols will be visible. All
-        other symbols will not be visible in the gate scope. In particular, no symbols in surrounding
-        local scopes will be visible.
+        The target (returned) symbol table contains: all builtin symbols, no symbols from a surrounding local scope,
+        all symbols from the global scope referring to gates gates, all symbols from the global scope
+        that are marked constant and refer to numeric data.
         """
         # pylint: disable=protected-access
         out = SymbolTable.__new__(SymbolTable)
@@ -133,9 +132,12 @@ class SymbolTable:
     def local_scope_copy(self):
         """Return a copy of the symbol table for use with a new local scope.
 
-        The data for globals and builtins are copied as references so that mutating
-        them in the copy does the same mutation in the parent. The data for locals
-        is a proper copy, not a reference. So mutating it has no effect on the parent.
+
+        Local variables created in the target (returned) symbol table will not
+        appear in the source symbol table. Thus, these local variables are
+        discarded and not visible upon returning to the surrounding scope. In
+        contrast, changes to data referred to by global symbols will be visible
+        in the surrounding scope.
         """
         # pylint: disable=protected-access
         out = SymbolTable.__new__(SymbolTable)
@@ -174,9 +176,7 @@ class SymbolTable:
         for table in (self._local_table, self._global_table, self._builtin_table):
             if symbol := table.get(name):
                 return symbol
-        raise KeyError(
-            f"Symbol {name} not found."
-        )
+        raise KeyError(f"Symbol {name} not found.")
 
     def get(self, name: str):
         """Return `Symbol` corresponding to `name`, or `None` if none exists."""
