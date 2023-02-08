@@ -358,6 +358,25 @@ def test_parameter_shadows_global_2():
         parse(source)
 
 
+def test_parameter_shadows_builtin():
+    source = """
+        include 'stdgates.inc';
+
+        qubit q;
+
+        gate my_gate(pi) q0 {
+            U(0, pi, 0) q0;
+        }
+
+        my_gate(4.5) q;
+    """
+    qc = parse(source)
+
+    expected = QuantumCircuit([Qubit()])
+    expected.u(0, 4.5, 0, 0)
+    assert qc.data[0].operation.definition == expected
+
+
 def test_parametrised_gate_definition():
     source = """
         include 'stdgates.inc';
