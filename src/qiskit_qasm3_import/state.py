@@ -104,7 +104,7 @@ class SymbolTable:
     def __init__(self):
         self.global_table = {}
         self.builtin_table = _BUILTINS.copy()
-        self.local_table = {} # For everything else
+        self.local_table = {}  # For everything else
 
     def gate_scope_copy(self):
         out = SymbolTable.__new__(SymbolTable)
@@ -112,11 +112,13 @@ class SymbolTable:
         out.builtin_table = self.builtin_table
         out.global_table = {}
         for name, item in self.global_table.items():
-            if (isinstance(item.type, types.Gate) or
-                isinstance(
+            if (
+                isinstance(item.type, types.Gate)
+                or isinstance(
                     item.type, (types.Int, types.Uint, types.Float, types.Angle, types.Duration)
                 )
-                and item.type.const):
+                and item.type.const
+            ):
                 out.global_table[name] = item  # TODO: use insert
         return out
 
@@ -128,22 +130,36 @@ class SymbolTable:
 
         return out
 
-    def insert(self, symbol: Symbol): # This does not catch shadowing builtins
+    def insert(self, symbol):
+        if isinstance(symbol, list):
+            for sym in symbol:
+                self._insert(sym)
+        else:
+            self._insert(symbol)
+
+    def _insert(self, symbol: Symbol):  # This does not catch shadowing builtins
         if symbol.scope == Scope.GLOBAL:
             self.global_table[symbol.name] = symbol
         else:
             self.local_table[symbol.name] = symbol
 
-    def exists(self, name: str):
+    def __contains__(self, name: str):
         return name in self.builtin_table or name in self.global_table or name in self.local_table
+
+    def __getitem__(self, name: str):
+        for table in (self.local_table, self.global_table, self.builtin_table):
+            if symbol := table.get(name):
+                return symbol
+        raise KeyError(
+            f"Symbol {name} not found."
+        )  # TODO: remove this if we decide against raising
 
     def get(self, name: str):
         # Search order determines which symbols can shadow others.
         for table in (self.local_table, self.global_table, self.builtin_table):
-            if (symbol := table.get(name)):
+            if symbol := table.get(name):
                 return symbol
         return None
-#        raise KeyError(f"Symbol {name} not found.")  # TODO: remove this if we decide against raising
 
     def global_symbols(self):
         return self.global_table.values()
@@ -165,7 +181,7 @@ class State:
         # We use the entire source, because at the moment, that's what all the error messages
         # expect; the nodes have references to the complete source in their spans.
         out = State(Scope.GATE, self.source)
-        out.symbol_table = self.symbol_table.gate_scope_copy() # A bit inefficient
+        out.symbol_table = self.symbol_table.gate_scope_copy()  # A bit inefficient
 
         return out
 
@@ -184,6 +200,8 @@ class State:
 
     def unique_name(self, prefix=""):
         """Get a name that is not defined in the current scope."""
-        while (name := f"{prefix}{next(self._unique)}") in self.symbol_table.local_table: # Not using an API
+        while (
+            name := f"{prefix}{next(self._unique)}"
+        ) in self.symbol_table.local_table:  # Not using an API
             pass
         return name

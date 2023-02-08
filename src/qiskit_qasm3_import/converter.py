@@ -94,7 +94,7 @@ class ConvertVisitor(QASMVisitor[State]):
 
         state = self.visit(node, State(Scope.GLOBAL, source))
         hardware_qubit_numbers = [
-            int(sym.name[1:]) # Omit the leading `$`.
+            int(sym.name[1:])  # Omit the leading `$`.
             for sym in state.symbol_table.global_symbols()
             if isinstance(sym.type, types.HardwareQubit)
         ]
@@ -272,9 +272,9 @@ class ConvertVisitor(QASMVisitor[State]):
         inner = context.gate_scope()
         parameters = [Parameter(name.name) for name in node.arguments]
         for parameter in parameters:
-            inner.symbol_table.insert(Symbol(
-                parameter.name, parameter, types.Angle(), Scope.GATE, node)
-                                      )
+            inner.symbol_table.insert(
+                Symbol(parameter.name, parameter, types.Angle(), Scope.GATE, node)
+            )
             self._add_circuit_parameter(parameter, inner)
         bits = [Qubit() for _ in node.qubits]
         inner.circuit.add_bits(bits)

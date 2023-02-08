@@ -90,7 +90,7 @@ class ValueResolver(QASMVisitor):
 
     def visit_Identifier(self, node: ast.Identifier):
         name = node.name
-        if not self.context.symbol_table.exists(name):
+        if name not in self.context.symbol_table:
             if is_physical(name):  # Physical qubits are not declared.
                 if self.context.scope == Scope.GATE:
                     raise_from_node(
@@ -102,7 +102,7 @@ class ValueResolver(QASMVisitor):
                 symbol = Symbol(name, bit, types.HardwareQubit(), Scope.GLOBAL, node)
                 self.context.symbol_table.insert(symbol)
             else:
-                 raise_from_node(node, f"name '{name}' is not defined in this scope")
+                raise_from_node(node, f"name '{name}' is not defined in this scope")
         else:
             symbol = self.context.symbol_table.get(name)
         return symbol.data, symbol.type
