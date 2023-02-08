@@ -62,7 +62,7 @@ class ValueResolver(QASMVisitor):
     like lists of bits).
 
     These resolvers are intended to be short-lived. Their instance state is the instance of
-    :class:`.State` created in :method:`.ConvertVisitor.convert`.
+    :class:`.State` created in :meth:`.ConvertVisitor.convert()`.
     """
 
     __slots__ = ("context",)
