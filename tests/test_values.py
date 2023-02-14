@@ -14,7 +14,8 @@ from qiskit_qasm3_import.expression import ValueResolver
 def _make_context(symbols=None):
     context = State(Scope.GLOBAL)
     if symbols is not None:
-        context.symbol_table.insert(symbols)
+        for sym in symbols:
+            context.symbol_table.insert(sym)
     return context
 
 

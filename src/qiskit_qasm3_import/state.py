@@ -147,15 +147,8 @@ class SymbolTable:
 
         return out
 
-    def insert(self, symbol: Union[List, Symbol]):
+    def insert(self, symbol: Union[List, Symbol]): # This does not catch shadowing builtins
         """Insert a `Symbol` (or each of a list thereof) into the symbol table."""
-        if isinstance(symbol, list):
-            for sym in symbol:
-                self._insert(sym)
-        else:
-            self._insert(symbol)
-
-    def _insert(self, symbol: Symbol):  # This does not catch shadowing builtins
         if symbol.scope == Scope.GLOBAL:
             self._global_table[symbol.name] = symbol
         else:
