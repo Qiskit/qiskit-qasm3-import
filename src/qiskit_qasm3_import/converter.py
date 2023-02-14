@@ -29,10 +29,7 @@ from qiskit.transpiler.layout import TranspileLayout
 from . import types
 from .data import Scope, Symbol
 from .exceptions import ConversionError, raise_from_node
-from .expression import (
-    ValueResolver,
-    resolve_condition,
-)
+from .expression import ValueResolver, resolve_condition
 
 from .state import State, _STDGATES
 
