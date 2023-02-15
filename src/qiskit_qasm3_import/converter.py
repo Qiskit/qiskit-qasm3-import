@@ -87,8 +87,8 @@ class ConvertVisitor(QASMVisitor[State]):
     def convert(self, node: ast.Program, *, source: Optional[str] = None) -> QuantumCircuit:
         """Convert a program node into a :class:`~qiskit.circuit.QuantumCircuit`.
 
-        If given, `source` is a string containing the OpenQASM 3 source code that was parsed into `node`.
-        This is used to generated improved error messages. A :class:`.State` containing
+        If given, `source` is a string containing the OpenQASM 3 source code that was parsed into
+        `node`.  This is used to generated improved error messages. A :class:`.State` containing
         information about the conversion is returned. The :class:`~qiskit.circuit.QuantumCircuit` is
         stored in property thereof named `circuit`.
         """

@@ -111,7 +111,9 @@ class Qubit(Type):
 
 @typing.final
 class HardwareQubit(Type):
-    """A hardware qubit.  This corresponds a hardware qubits referenced in Terra's :class:`~qiskit.transpiler.TranspilerLayout`."""
+    """A hardware qubit.
+    This corresponds a hardware qubits referenced in Terra's """
+    ":class:`~qiskit.transpiler.TranspilerLayout`."
 
     __slots__ = ()
 

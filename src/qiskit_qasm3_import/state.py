@@ -69,8 +69,9 @@ _BUILTINS = {
 class AddressingMode:
     """Addressing mode for qubits in OpenQASM 3 programs.
 
-    This class is useful as long as we allow only physical or virtual addressing modes, but
-    not mixed. If the latter is supported in the future, this class will be modified or removed.
+    This class is useful as long as we allow only physical or virtual addressing modes, but not
+    mixed. If the latter is supported in the future, this class will be modified or removed.
+
     """
 
     _Mode = enum.Enum("_Mode", ["UNKNOWN", "PHYSICAL", "VIRTUAL"])
@@ -80,20 +81,21 @@ class AddressingMode:
         self._state = self.UNKNOWN
 
     def set_physical_mode(self, node):
-        """Set the addressing mode to physical. On success return `True`, otherwise raise an exception."""
+        """Set the addressing mode to physical. On success return `True`, otherwise raise an
+        exception."""
         if self._state == self.VIRTUAL:
-            raise_from_node(
-                node,
-                "Physical qubit referenced in virtual addressing mode. Mixing modes not currently supported.",
-            )
+            raise_from_node( node, "Physical qubit referenced in virtual addressing mode. Mixing "
+            "modes not currently supported.")
         self._state = self.PHYSICAL
 
     def set_virtual_mode(self, node):
-        """Set the addressing mode to virtual. On success return `True`, otherwise raise an exception."""
+        """Set the addressing mode to virtual.
+        On success return `True`, otherwise raise an exception."""
         if self._state == self.PHYSICAL:
             raise_from_node(
                 node,
-                "Virtual qubit declared in physical addressing mode. Mixing modes not currently supported.",
+                "Virtual qubit declared in physical addressing mode. Mixing modes not currently "
+                "supported."
             )
         self._state = self.VIRTUAL
 
@@ -109,9 +111,9 @@ class SymbolTable:
     def gate_scope_copy(self):
         """Return a copy of the symbol table for use in the lexical scope of a gate definition.
 
-        The target (returned) symbol table contains: all builtin symbols, no symbols from a surrounding local scope,
-        all symbols from the global scope referring to gates gates, all symbols from the global scope
-        that are marked constant and refer to numeric data.
+        The target (returned) symbol table contains: all builtin symbols, no symbols from a
+        surrounding local scope, all symbols from the global scope referring to gates gates, all
+        symbols from the global scope that are marked constant and refer to numeric data.
         """
         # pylint: disable=protected-access
         out = SymbolTable.__new__(SymbolTable)
@@ -133,11 +135,10 @@ class SymbolTable:
         """Return a copy of the symbol table for use with a new local scope.
 
 
-        Local variables created in the target (returned) symbol table will not
-        appear in the source symbol table. Thus, these local variables are
-        discarded and not visible upon returning to the surrounding scope. In
-        contrast, changes to data referred to by global symbols will be visible
-        in the surrounding scope.
+        Local variables created in the target (returned) symbol table will not appear in the source
+        symbol table. Thus, these local variables are discarded and not visible upon returning to
+        the surrounding scope. In contrast, changes to data referred to by global symbols will be
+        visible in the surrounding scope.
         """
         # pylint: disable=protected-access
         out = SymbolTable.__new__(SymbolTable)
