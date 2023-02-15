@@ -100,7 +100,8 @@ class ValueResolver(QASMVisitor):
                         ),
                     )
                 self.context.addressing_mode.set_physical_mode(node)
-                self.context.circuit.add_bits([bit := Qubit()])
+                bit = Qubit()
+                self.context.circuit.add_bits([bit])
                 symbol = Symbol(name, bit, types.HardwareQubit(), Scope.GLOBAL, node)
                 self.context.symbol_table.insert(symbol)
             else:
