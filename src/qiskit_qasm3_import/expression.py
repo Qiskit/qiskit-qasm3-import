@@ -96,8 +96,10 @@ class ValueResolver(QASMVisitor):
                 if self.context.scope == Scope.GATE:
                     raise_from_node(
                         node,
-                        (f"Illegal qubit reference '{name}'. References to hardware "
-                         "qubits not allowed in gate definitions.")
+                        (
+                            f"Illegal qubit reference '{name}'. References to hardware "
+                            "qubits not allowed in gate definitions."
+                        ),
                     )
                 self.context.addressing_mode.set_physical_mode(node)
                 self.context.circuit.add_bits([bit := Qubit()])

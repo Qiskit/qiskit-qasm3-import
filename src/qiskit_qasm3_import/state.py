@@ -84,8 +84,11 @@ class AddressingMode:
         """Set the addressing mode to physical. On success return `True`, otherwise raise an
         exception."""
         if self._state == self.VIRTUAL:
-            raise_from_node( node, "Physical qubit referenced in virtual addressing mode. Mixing "
-            "modes not currently supported.")
+            raise_from_node(
+                node,
+                "Physical qubit referenced in virtual addressing mode. Mixing "
+                "modes not currently supported.",
+            )
         self._state = self.PHYSICAL
 
     def set_virtual_mode(self, node):
@@ -95,7 +98,7 @@ class AddressingMode:
             raise_from_node(
                 node,
                 "Virtual qubit declared in physical addressing mode. Mixing modes not currently "
-                "supported."
+                "supported.",
             )
         self._state = self.VIRTUAL
 
@@ -148,7 +151,7 @@ class SymbolTable:
 
         return out
 
-    def insert(self, symbol: Union[List, Symbol]): # This does not catch shadowing builtins
+    def insert(self, symbol: Union[List, Symbol]):  # This does not catch shadowing builtins
         """Insert a `Symbol` into the symbol table."""
         if symbol.scope == Scope.GLOBAL:
             self._global_table[symbol.name] = symbol
