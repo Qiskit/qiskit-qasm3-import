@@ -78,15 +78,13 @@ class ValueResolver(QASMVisitor):
 
         return self.visit(node)
 
-    # pylint: disable=arguments-differ
-    def visit(self, node: ast.QASMNode) -> Tuple[Any, types.Type]:
+    def visit(self, node: ast.QASMNode, context: None = None) -> Tuple[Any, types.Type]:
         value, type = super().visit(node)
         if isinstance(type, types.Error):
             raise_from_node(node, "type error")
         return value, type
 
-    # pylint: disable=arguments-differ
-    def generic_visit(self, node: ast.QASMNode):
+    def generic_visit(self, node: ast.QASMNode, context: None = None):
         raise_from_node(node, f"'{node.__class__.__name__}' cannot be resolved into a Qiskit value")
 
     def visit_Identifier(self, node: ast.Identifier):
