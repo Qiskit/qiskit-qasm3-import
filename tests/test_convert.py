@@ -1004,6 +1004,23 @@ def test_reject_mixed_addressing_mode_virtual_register():
         parse(source)
 
 
+def test_reject_mixed_addressing_mode_local_scope():
+    source = """
+    include "stdgates.inc";
+
+    bit[1] mid;
+
+    while(mid == "0") {
+      h $0;
+      mid[0] = measure $0;
+    }
+
+    qubit q;
+    """
+    with pytest.raises(ConversionError, match="Virtual qubit declared in physical addressing mode"):
+        parse(source)
+
+
 def test_reject_hardware_qubit_in_gate_body_1():
     source = """
         include 'stdgates.inc';
