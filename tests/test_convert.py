@@ -1124,3 +1124,20 @@ def test_hardware_qubit_first_seen_in_local_scope():
     qc = parse(source)
     layout = _make_layout([100, 101])
     assert qc._layout == layout
+
+
+def test_use_hardware_qubit_first_seen_in_local_scope():
+    source = """
+    include "stdgates.inc";
+
+    bit[1] mid;
+
+    while (mid == "0") {
+        h $100;
+        mid[0] = measure $100;
+     }
+    x $100;
+    """
+    qc = parse(source)
+    layout = _make_layout([100])
+    assert qc._layout == layout
