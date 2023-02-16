@@ -91,7 +91,7 @@ class ValueResolver(QASMVisitor):
         name = node.name
         if name not in self.context.symbol_table:
             if is_physical(name):  # Physical qubits are not declared.
-                if self.context.scope == Scope.GATE:
+                if self.context.scope is Scope.GATE:
                     raise_from_node(
                         node,
                         (
