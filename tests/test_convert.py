@@ -1046,6 +1046,24 @@ def test_reject_hardware_qubit_in_gate_body_2():
         parse(source)
 
 
+def test_hardware_mode_and_user_gates():
+    source = """
+        include 'stdgates.inc';
+
+        reset $0;
+
+        gate my_gate(pi) q0 {
+            U(0, pi, 0) q0;
+        }
+
+        my_gate(4.5) $0;
+    """
+    qc = parse(source)
+    expected = QuantumCircuit([Qubit()])
+    expected.u(0, 4.5, 0, 0)
+    assert qc.data[1].operation.definition == expected
+
+
 def _make_layout(hw_qubit_numbers):
     qr = QuantumRegister(len(hw_qubit_numbers), "qr")
     return TranspileLayout(
