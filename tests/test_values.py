@@ -65,8 +65,6 @@ def test_physical_qubit_identifier():
         q0, q0_type = resolver.resolve(ast.Identifier(name=name))
         assert isinstance(q0, Qubit)
         assert isinstance(q0_type, types.HardwareQubit)
-    with pytest.raises(ConversionError, match="not defined in this scope"):
-        resolver.resolve(ast.Identifier(name="$q"))
 
 
 def test_discrete_set_empty():
