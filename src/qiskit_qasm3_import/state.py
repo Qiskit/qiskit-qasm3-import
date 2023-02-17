@@ -153,7 +153,7 @@ class SymbolTable:
 
     def insert(self, symbol: Union[List, Symbol]):  # This does not catch shadowing builtins
         """Insert a `Symbol` into the symbol table."""
-        if symbol.scope == Scope.GLOBAL:
+        if symbol.scope is Scope.GLOBAL:
             self._global_table[symbol.name] = symbol
         else:
             self._local_table[symbol.name] = symbol
