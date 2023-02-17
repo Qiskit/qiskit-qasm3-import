@@ -175,13 +175,13 @@ class SymbolTable:
                 return symbol
         raise KeyError(f"Symbol {name} not found.")
 
-    def get(self, name: str):
+    def get(self, name: str, default=None):
         """Return `Symbol` corresponding to `name`, or `None` if none exists."""
         # Search order determines which symbols can shadow others.
         for table in (self._local_table, self._global_table, self._builtin_table):
             if symbol := table.get(name):
                 return symbol
-        return None
+        return default
 
     def hardware_qubits(self):
         """Return an iterator over the `Symbol`s referring to hardware qubits."""

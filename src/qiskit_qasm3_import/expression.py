@@ -88,26 +88,24 @@ class ValueResolver(QASMVisitor):
         raise_from_node(node, f"'{node.__class__.__name__}' cannot be resolved into a Qiskit value")
 
     def visit_Identifier(self, node: ast.Identifier):
-        name = node.name
-        if name not in self.context.symbol_table:
-            if is_physical(name):  # Physical qubits are not declared.
-                if self.context.scope is Scope.GATE:
-                    raise_from_node(
-                        node,
-                        (
-                            f"Illegal qubit reference '{name}'. References to hardware "
-                            "qubits not allowed in gate definitions."
-                        ),
-                    )
-                self.context.addressing_mode.set_physical_mode(node)
-                bit = Qubit()
-                self.context.circuit.add_bits([bit])
-                symbol = Symbol(name, bit, types.HardwareQubit(), Scope.GLOBAL, node)
-                self.context.symbol_table.insert(symbol)
-            else:
-                raise_from_node(node, f"name '{name}' is not defined in this scope")
-        else:
-            symbol = self.context.symbol_table[name]
+        cxt = self.context
+        if (symbol := cxt.symbol_table.get(node.name, None)) is not None:
+            return symbol.data, symbol.type
+        if not is_physical(node.name):
+            raise_from_node(node, f"name '{node.name}' is not defined in this scope")
+        if cxt.scope is Scope.GATE:
+            raise_from_node(
+                node,
+                (
+                    f"Illegal qubit reference '{node.name}'. References to hardware "
+                    "qubits not allowed in gate definitions."
+                ),
+            )
+        cxt.addressing_mode.set_physical_mode(node)
+        bit = Qubit()
+        cxt.circuit.add_bits([bit])
+        symbol = Symbol(node.name, bit, types.HardwareQubit(), Scope.GLOBAL, node)
+        cxt.symbol_table.insert(symbol)
         return symbol.data, symbol.type
 
     def visit_IntegerLiteral(self, node: ast.IntegerLiteral):
