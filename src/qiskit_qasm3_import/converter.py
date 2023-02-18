@@ -29,7 +29,7 @@ from qiskit.transpiler.layout import TranspileLayout
 from . import types
 from .data import Scope, Symbol
 from .exceptions import ConversionError, raise_from_node
-from .expression import ValueResolver, resolve_condition, is_physical
+from .expression import ValueResolver, resolve_condition, hardware_qubit_map
 
 from .state import State, _STDGATES
 
@@ -93,17 +93,10 @@ class ConvertVisitor(QASMVisitor[State]):
         """
 
         state = self.visit(node, State(source))
-        # A hardware-qubit symbol has the form '$' followed by digits. We keep only the digits.
-        hardware_qubit_numbers = [
-            int(sym.name[1:]) for sym in state.symbol_table.globals() if is_physical(sym)
-        ]
-        if (num_qubits := len(hardware_qubit_numbers)) > 0:
-            qr = QuantumRegister(num_qubits, "qr")
-            # TODO: When access to _layout is added to terra, use the API.
-            state.circuit._layout = TranspileLayout(  # pylint: disable=protected-access
-                Layout.from_intlist(hardware_qubit_numbers, qr),
-                dict(zip(qr, hardware_qubit_numbers)),
-            )
+        hardware_qubits = hardware_qubit_map(state.symbol_table)
+        if len(hardware_qubits) > 0:
+            # pylint: disable=protected-access
+            state.circuit._layout = TranspileLayout(Layout(hardware_qubits), hardware_qubits)
         return state
 
     def _raise_previously_defined(self, new: Symbol, old: Symbol, node: ast.QASMNode) -> NoReturn:

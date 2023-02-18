@@ -10,8 +10,6 @@ from qiskit.circuit import (
     Clbit,
     Qubit,
 )
-from qiskit.transpiler import Layout
-from qiskit.transpiler.layout import TranspileLayout
 from qiskit.quantum_info import Operator
 
 from qiskit_qasm3_import import parse, ConversionError, PhysicalQubitInGateError
@@ -1074,19 +1072,6 @@ def test_hardware_mode_and_user_gates():
     assert qc.data[1].operation.definition == expected
 
 
-def _make_layout(hw_qubit_numbers):
-    qr = QuantumRegister(len(hw_qubit_numbers), "qr")
-    return TranspileLayout(
-        Layout.from_intlist(hw_qubit_numbers, qr),
-        dict(zip(qr, hw_qubit_numbers)),
-    )
-
-
-# pylint: disable=protected-access
-def _add_layout(circuit, hw_qubit_numbers):
-    circuit._layout = _make_layout(hw_qubit_numbers)
-
-
 # pylint: disable=protected-access
 def test_layout_for_hardware_qubits():
     source = """
@@ -1095,16 +1080,8 @@ def test_layout_for_hardware_qubits():
     qc = parse(source)
     expected = QuantumCircuit([Qubit()])
     expected.reset(0)
-    _add_layout(expected, [99])
-
     assert qc == expected
-    assert qc._layout == expected._layout
-
-    expected2 = QuantumCircuit([Qubit()])
-    expected2.reset(0)
-    _add_layout(expected2, [0])
-
-    assert qc._layout != expected2._layout
+    assert qc._layout.input_qubit_mapping == {qc.qubits[0]: 99}
 
 
 def test_hardware_qubit_local_scope():
@@ -1113,8 +1090,8 @@ def test_hardware_qubit_local_scope():
 
     bit[2] mid;
 
-    reset $100;
     reset $101;
+    reset $100;
     while (mid == "00") {
         h $100;
         h $101;
@@ -1122,10 +1099,8 @@ def test_hardware_qubit_local_scope():
         mid[1] = measure $101;
      }
     """
-
     qc = parse(source)
-    layout = _make_layout([100, 101])
-    assert qc._layout == layout
+    assert qc._layout.input_qubit_mapping == dict(zip(qc.qubits, [101, 100]))
 
 
 def test_hardware_qubit_nested_scope():
@@ -1146,10 +1121,8 @@ def test_hardware_qubit_nested_scope():
          }
     }
     """
-
     qc = parse(source)
-    layout = _make_layout([100, 101])
-    assert qc._layout == layout
+    assert qc._layout.input_qubit_mapping == dict(zip(qc.qubits, [100, 101]))
 
 
 def test_hardware_qubit_first_seen_in_local_scope():
@@ -1158,17 +1131,17 @@ def test_hardware_qubit_first_seen_in_local_scope():
 
     bit[2] mid;
 
+    h $102;
+
     while (mid == "00") {
-        h $100;
+        h $0;
         h $101;
-        mid[0] = measure $100;
-        mid[1] = measure $101;
+        mid[0] = measure $101;
+        mid[1] = measure $0;
      }
     """
-
     qc = parse(source)
-    layout = _make_layout([100, 101])
-    assert qc._layout == layout
+    assert qc._layout.input_qubit_mapping == dict(zip(qc.qubits, [102, 0, 101]))
 
 
 def test_use_hardware_qubit_first_seen_in_local_scope():
@@ -1184,5 +1157,4 @@ def test_use_hardware_qubit_first_seen_in_local_scope():
     x $100;
     """
     qc = parse(source)
-    layout = _make_layout([100])
-    assert qc._layout == layout
+    assert qc._layout.input_qubit_mapping == dict(zip(qc.qubits, [100]))
