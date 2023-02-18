@@ -13,18 +13,20 @@ def _equal(left: ast.Expression, right: ast.Expression):
     return ast.BinaryExpression(ast.BinaryOperator["=="], left, right)
 
 
-def _make_context(symbols):
+def _make_context(symbols=None):
     context = State(Scope.GLOBAL)
-    context.symbol_table = symbols
+    if symbols is not None:
+        for sym in symbols:
+            context.symbol_table.insert(sym)
     return context
 
 
 @pytest.mark.parametrize("result", (True, False))
 def test_bit_resolution(result):
     bit = Clbit()
-    symbols = {
-        "a": Symbol("a", bit, types.Bit(), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", bit, types.Bit(), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = _equal(ast.Identifier("a"), ast.BooleanLiteral(result))
     assert resolve_condition(node, context) == (bit, result)
@@ -36,9 +38,9 @@ def test_bit_resolution(result):
 @pytest.mark.parametrize("result", (True, False))
 def test_bit_negative_resolution(result):
     bit = Clbit()
-    symbols = {
-        "a": Symbol("a", bit, types.Bit(), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", bit, types.Bit(), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = ast.BinaryExpression(
         ast.BinaryOperator["!="], ast.Identifier("a"), ast.BooleanLiteral(not result)
@@ -55,9 +57,9 @@ def test_bit_negative_resolution(result):
 
 def test_implicit_bit():
     bit = Clbit()
-    symbols = {
-        "a": Symbol("a", bit, types.Bit(), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", bit, types.Bit(), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = ast.Identifier("a")
     assert resolve_condition(node, context) == (bit, True)
@@ -65,9 +67,9 @@ def test_implicit_bit():
 
 def test_implicit_negated_bit():
     bit = Clbit()
-    symbols = {
-        "a": Symbol("a", bit, types.Bit(), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", bit, types.Bit(), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = ast.UnaryExpression(ast.UnaryOperator["~"], ast.Identifier("a"))
     assert resolve_condition(node, context) == (bit, False)
@@ -75,9 +77,9 @@ def test_implicit_negated_bit():
 
 def test_incorrect_unary_operator():
     bit = Clbit()
-    symbols = {
-        "a": Symbol("a", bit, types.Bit(), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", bit, types.Bit(), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = ast.UnaryExpression(ast.UnaryOperator["-"], ast.Identifier("a"))
     with pytest.raises(ConversionError, match="unhandled unary operator"):
@@ -86,9 +88,9 @@ def test_incorrect_unary_operator():
 
 def test_incorrect_binary_operator():
     bit = Clbit()
-    symbols = {
-        "a": Symbol("a", bit, types.Bit(), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", bit, types.Bit(), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = ast.BinaryExpression(ast.BinaryOperator["-"], ast.Identifier("a"), ast.Identifier("a"))
     with pytest.raises(ConversionError, match="unhandled binary operator"):
@@ -102,10 +104,10 @@ def test_reject_nonbit_condition():
 
 def test_index_to_bit():
     register = ClassicalRegister(3)
-    symbols = {
-        "a": Symbol("a", register, types.BitArray(5), Scope.GLOBAL),
-        "b": Symbol("b", 1, types.Int(const=True), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", register, types.BitArray(5), Scope.GLOBAL),
+        Symbol("b", 1, types.Int(const=True), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = _equal(
         ast.IndexExpression(ast.Identifier("a"), [ast.Identifier("b")]), ast.BooleanLiteral(True)
@@ -114,9 +116,9 @@ def test_index_to_bit():
 
 
 def test_non_bit_comparison():
-    symbols = {
-        "a": Symbol("a", Parameter("a"), types.Int(const=False), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", Parameter("a"), types.Int(const=False), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = _equal(ast.IntegerLiteral(1), ast.Identifier("a"))
     with pytest.raises(ConversionError, match="conditions must be"):
@@ -127,9 +129,9 @@ def test_non_bit_comparison():
 
 
 def test_reject_compare_bit_to_non_bool():
-    symbols = {
-        "a": Symbol("a", Clbit(), types.Bit(), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", Clbit(), types.Bit(), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = _equal(ast.IntegerLiteral(1), ast.Identifier("a"))
     with pytest.raises(ConversionError, match="conditions must be"):
@@ -141,9 +143,9 @@ def test_reject_compare_bit_to_non_bool():
 
 def test_creg_to_int():
     creg = ClassicalRegister(3)
-    symbols = {
-        "a": Symbol("a", creg, types.BitArray(len(creg)), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", creg, types.BitArray(len(creg)), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = _equal(ast.Identifier("a"), ast.IntegerLiteral(1))
     assert resolve_condition(node, context) == (creg, 1)
@@ -153,9 +155,9 @@ def test_creg_to_int():
 
 def test_creg_rejects_unequal():
     creg = ClassicalRegister(3)
-    symbols = {
-        "a": Symbol("a", creg, types.BitArray(len(creg)), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", creg, types.BitArray(len(creg)), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = ast.BinaryExpression(
         ast.BinaryOperator["!="], ast.Identifier("a"), ast.IntegerLiteral(1)
@@ -166,10 +168,10 @@ def test_creg_rejects_unequal():
 
 def test_creg_rejects_nonconst():
     creg = ClassicalRegister(3)
-    symbols = {
-        "a": Symbol("a", creg, types.BitArray(len(creg)), Scope.GLOBAL),
-        "b": Symbol("b", Parameter("b"), types.Int(const=False), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", creg, types.BitArray(len(creg)), Scope.GLOBAL),
+        Symbol("b", Parameter("b"), types.Int(const=False), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = _equal(ast.Identifier("a"), ast.Identifier("b"))
     with pytest.raises(ConversionError, match="conditions must be"):
@@ -178,10 +180,10 @@ def test_creg_rejects_nonconst():
 
 def test_creg_rejects_noninteger():
     creg = ClassicalRegister(3)
-    symbols = {
-        "a": Symbol("a", creg, types.BitArray(len(creg)), Scope.GLOBAL),
-        "b": Symbol("b", Parameter("b"), types.Float(const=True), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", creg, types.BitArray(len(creg)), Scope.GLOBAL),
+        Symbol("b", Parameter("b"), types.Float(const=True), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = _equal(ast.Identifier("a"), ast.Identifier("b"))
     with pytest.raises(ConversionError, match="conditions must be"):
@@ -190,9 +192,9 @@ def test_creg_rejects_noninteger():
 
 def test_implicit_creg():
     creg = ClassicalRegister(3)
-    symbols = {
-        "a": Symbol("a", creg, types.BitArray(len(creg)), Scope.GLOBAL),
-    }
+    symbols = [
+        Symbol("a", creg, types.BitArray(len(creg)), Scope.GLOBAL),
+    ]
     context = _make_context(symbols)
     node = _equal(
         ast.IndexExpression(

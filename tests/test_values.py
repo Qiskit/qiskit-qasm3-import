@@ -55,7 +55,7 @@ def test_identifier():
         resolved_value, resolved_type = resolver.resolve(ast.Identifier(name=name))
         assert resolved_value == symbol.data
         assert resolved_type == symbol.type
-    with pytest.raises(ConversionError, match="not defined in this scope"):
+    with pytest.raises(ConversionError, match="Undefined symbol 'c'"):
         resolver.resolve(ast.Identifier(name="c"))
 
 

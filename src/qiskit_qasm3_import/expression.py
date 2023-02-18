@@ -25,9 +25,9 @@ from openqasm3.visitor import QASMVisitor
 from qiskit.circuit import Clbit, Qubit
 
 from . import types
-from .exceptions import raise_from_node
+from .exceptions import raise_from_node, PhysicalQubitInGateError
 from .data import Symbol, Scope
-from .state import State
+from .state import State, SymbolTable
 
 
 _IntegerT = Union[types.Never, types.Int, types.Uint]
@@ -35,8 +35,10 @@ _IntegerT = Union[types.Never, types.Int, types.Uint]
 _PHYSICAL_QUBIT_RE = re.compile(r"\$\d+")
 
 
-def is_physical(name: str):
+def is_physical(name: Union[str, Symbol]):
     "Return true if name is a valid identifier for a physical qubit."
+    if isinstance(name, Symbol):
+        name = name.name
     return re.match(_PHYSICAL_QUBIT_RE, name) is not None
 
 
@@ -89,18 +91,13 @@ class ValueResolver(QASMVisitor):
 
     def visit_Identifier(self, node: ast.Identifier):
         cxt = self.context
-        if (symbol := cxt.symbol_table.get(node.name, None)) is not None:
+        assert isinstance(cxt.symbol_table, SymbolTable)
+        if (symbol := cxt.symbol_table.get(node.name, node)) is not None:
             return symbol.data, symbol.type
         if not is_physical(node.name):
-            raise_from_node(node, f"name '{node.name}' is not defined in this scope")
+            raise_from_node(node, f"Undefined symbol '{node.name}'.")
         if cxt.scope is Scope.GATE:
-            raise_from_node(
-                node,
-                (
-                    f"Illegal qubit reference '{node.name}'. References to hardware "
-                    "qubits not allowed in gate definitions."
-                ),
-            )
+            raise PhysicalQubitInGateError(node.name, node)
         cxt.addressing_mode.set_physical_mode(node)
         bit = Qubit()
         cxt.circuit.add_bits([bit])

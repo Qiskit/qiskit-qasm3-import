@@ -29,10 +29,9 @@ from qiskit.transpiler.layout import TranspileLayout
 from . import types
 from .data import Scope, Symbol
 from .exceptions import ConversionError, raise_from_node
-from .expression import ValueResolver, resolve_condition
+from .expression import ValueResolver, resolve_condition, is_physical
 
 from .state import State, _STDGATES
-
 
 _QASM2_IDENTIFIER = re.compile(r"[a-z]\w*", flags=re.ASCII)
 
@@ -93,9 +92,11 @@ class ConvertVisitor(QASMVisitor[State]):
         stored in property thereof named `circuit`.
         """
 
-        state = self.visit(node, State(Scope.GLOBAL, source))
+        state = self.visit(node, State(source))
         # A hardware-qubit symbol has the form '$' followed by digits. We keep only the digits.
-        hardware_qubit_numbers = [int(sym.name[1:]) for sym in state.symbol_table.hardware_qubits()]
+        hardware_qubit_numbers = [
+            int(sym.name[1:]) for sym in state.symbol_table.globals() if is_physical(sym)
+        ]
         if (num_qubits := len(hardware_qubit_numbers)) > 0:
             qr = QuantumRegister(num_qubits, "qr")
             # TODO: When access to _layout is added to terra, use the API.
@@ -124,7 +125,7 @@ class ConvertVisitor(QASMVisitor[State]):
             raise_from_node(definer, "gates can only be declared globally")
         type = types.Gate(n_parameters, n_qubits)
         symbol = Symbol(name, definition, type, Scope.GLOBAL, definer)
-        if (previous := context.symbol_table.get(name)) is not None:
+        if (previous := context.symbol_table.get(name, definer)) is not None:
             self._raise_previously_defined(symbol, previous, definer)
         context.symbol_table.insert(symbol)
         return context
@@ -293,7 +294,7 @@ class ConvertVisitor(QASMVisitor[State]):
     def visit_QuantumGate(self, node: ast.QuantumGate, context: State) -> State:
         if node.duration is not None:
             raise_from_node(node, "gates with durations are not supported.")
-        if (gate_symbol := context.symbol_table.get(node.name.name)) is None:
+        if (gate_symbol := context.symbol_table.get(node.name.name, node)) is None:
             raise_from_node(node, f"gate '{node.name.name}' is not defined.")
         if not isinstance(gate_symbol.type, types.Gate):
             message = f"'{node.name.name}' is a '{gate_symbol.type.pretty()}', not a gate."

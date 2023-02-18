@@ -14,7 +14,7 @@ from qiskit.transpiler import Layout
 from qiskit.transpiler.layout import TranspileLayout
 from qiskit.quantum_info import Operator
 
-from qiskit_qasm3_import import parse, ConversionError
+from qiskit_qasm3_import import parse, ConversionError, PhysicalQubitInGateError
 
 
 def test_readme_circuit():
@@ -142,6 +142,16 @@ def test_stdgates_not_implicitly_included():
         h q;
     """
     with pytest.raises(ConversionError, match="gate 'h' is not defined"):
+        parse(source)
+
+
+def test_undefined_symbol():
+    source = """
+       gate my_gate q {
+          U(0, new_symbol, 0) q;
+       }
+    """
+    with pytest.raises(ConversionError, match="Undefined symbol 'new_symbol'"):
         parse(source)
 
 
@@ -467,7 +477,7 @@ def test_gate_definition_scope_limited():
             U(x, 0, 0) q;
         }
     """
-    with pytest.raises(ConversionError, match="name 'x' is not defined"):
+    with pytest.raises(ConversionError, match="not visible in the scope of a"):
         parse(source)
 
 
@@ -828,7 +838,7 @@ def test_if_else_does_not_share_scope():
             x q1;
         }
     """
-    with pytest.raises(ConversionError, match="name 'q1' is not defined"):
+    with pytest.raises(ConversionError, match="Undefined symbol 'q1'"):
         parse(source)
 
 
@@ -843,7 +853,7 @@ def test_if_does_not_leak_scope():
         }
         x q1;
     """
-    with pytest.raises(ConversionError, match="name 'q1' is not defined"):
+    with pytest.raises(ConversionError, match="Undefined symbol 'q1'"):
         parse(source)
 
 
@@ -1029,7 +1039,7 @@ def test_reject_hardware_qubit_in_gate_body_1():
            h $0;
         }
     """
-    with pytest.raises(ConversionError, match="hardware qubits not allowed in gate definitions"):
+    with pytest.raises(PhysicalQubitInGateError):
         parse(source)
 
 
@@ -1042,7 +1052,7 @@ def test_reject_hardware_qubit_in_gate_body_2():
            h $0;
         }
     """
-    with pytest.raises(ConversionError, match="hardware qubits not allowed in gate definitions"):
+    with pytest.raises(PhysicalQubitInGateError):
         parse(source)
 
 
