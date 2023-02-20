@@ -42,13 +42,6 @@ def is_physical(name: Union[str, Symbol]):
     return re.match(_PHYSICAL_QUBIT_RE, name) is not None
 
 
-# A hardware-qubit symbol has the form '$' followed by digits.
-# The digits are the identifier used by backends.
-def hardware_qubit_map(symbol_table: SymbolTable):
-    "Return a `dict` mapping `Qubit` instances to `int`s representing physical qubit identifiers."
-    return {sym.data: int(sym.name[1:]) for sym in symbol_table.globals() if is_physical(sym)}
-
-
 def join_integer_types(left: _IntegerT, right: _IntegerT) -> _IntegerT:
     if isinstance(left, types.Never):
         return right

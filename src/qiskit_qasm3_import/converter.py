@@ -30,8 +30,8 @@ from qiskit.circuit.library import standard_gates as _std
 from . import types
 from .data import Scope, Symbol
 from .exceptions import ConversionError, raise_from_node
-from .expression import ValueResolver, resolve_condition, hardware_qubit_map
-from .state import State
+from .expression import ValueResolver, resolve_condition, is_physical
+from .state import State, SymbolTable
 
 _QASM2_IDENTIFIER = re.compile(r"[a-z]\w*", flags=re.ASCII)
 
@@ -86,6 +86,13 @@ def _escape_qasm2(name: str) -> str:
     if not name or name[0] not in string.ascii_lowercase:
         name = "esc_" + name
     return name
+
+
+# A hardware-qubit symbol has the form '$' followed by digits.
+# The digits are the identifier used by backends.
+def hardware_qubit_map(symbol_table: SymbolTable):
+    "Return a `dict` mapping `Qubit` instances to `int`s representing physical qubit identifiers."
+    return {sym.data: int(sym.name[1:]) for sym in symbol_table.globals() if is_physical(sym)}
 
 
 class GateBuilder:
