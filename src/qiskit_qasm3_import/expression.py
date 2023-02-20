@@ -27,7 +27,7 @@ from qiskit.circuit import Clbit, Qubit
 from . import types
 from .exceptions import raise_from_node, PhysicalQubitInGateError
 from .data import Symbol, Scope
-from .state import State, SymbolTable
+from .state import State
 
 
 _IntegerT = Union[types.Never, types.Int, types.Uint]
@@ -91,7 +91,6 @@ class ValueResolver(QASMVisitor):
 
     def visit_Identifier(self, node: ast.Identifier):
         cxt = self.context
-        assert isinstance(cxt.symbol_table, SymbolTable)
         if (symbol := cxt.symbol_table.get(node.name, node)) is not None:
             return symbol.data, symbol.type
         if not is_physical(node.name):
@@ -276,7 +275,6 @@ class ValueResolver(QASMVisitor):
             )
         if isinstance(indexer, ast.DiscreteSet):
             set_values, set_type = self.visit(indexer)
-            assert isinstance(set_type, types.Sequence)
             if not set_values:
                 return [], type(collection_type)(0)
             if not (isinstance(set_type.base, (types.Int, types.Uint)) and set_type.base.const):
