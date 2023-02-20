@@ -101,9 +101,8 @@ class SymbolTable:
         ):
             return symbol
         if self.scope is Scope.GATE:
-            if (
-                isinstance(symbol.type, types.Gate)
-                or isinstance(
+            if isinstance(symbol.type, types.Gate) or (
+                isinstance(
                     symbol.type, (types.Int, types.Uint, types.Float, types.Angle, types.Duration)
                 )
                 and symbol.type.const
