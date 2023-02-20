@@ -14,7 +14,7 @@ def _equal(left: ast.Expression, right: ast.Expression):
 
 
 def _make_context(symbols=None):
-    context = State(Scope.GLOBAL)
+    context = State()
     if symbols is not None:
         for sym in symbols:
             context.symbol_table.insert(sym)
