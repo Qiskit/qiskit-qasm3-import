@@ -25,15 +25,54 @@ from qiskit.circuit import (
 from qiskit.circuit.parametertable import ParameterReferences
 from qiskit.transpiler import Layout
 from qiskit.transpiler.layout import TranspileLayout
+from qiskit.circuit.library import standard_gates as _std
 
 from . import types
 from .data import Scope, Symbol
 from .exceptions import ConversionError, raise_from_node
 from .expression import ValueResolver, resolve_condition, hardware_qubit_map
-
-from .state import State, _STDGATES
+from .state import State
 
 _QASM2_IDENTIFIER = re.compile(r"[a-z]\w*", flags=re.ASCII)
+
+_STDGATES = {
+    "p": (_std.PhaseGate, 1, 1),
+    "x": (_std.XGate, 0, 1),
+    "y": (_std.YGate, 0, 1),
+    "z": (_std.ZGate, 0, 1),
+    "h": (_std.HGate, 0, 1),
+    "s": (_std.SGate, 0, 1),
+    "sdg": (_std.SdgGate, 0, 1),
+    "t": (_std.TGate, 0, 1),
+    "tdg": (_std.TdgGate, 0, 1),
+    "sx": (_std.SXGate, 0, 1),
+    "rx": (_std.RXGate, 1, 1),
+    "ry": (_std.RYGate, 1, 1),
+    "rz": (_std.RZGate, 1, 1),
+    "cx": (_std.CXGate, 0, 2),
+    "cy": (_std.CYGate, 0, 2),
+    "cz": (_std.CZGate, 0, 2),
+    "cp": (_std.CPhaseGate, 1, 2),
+    "crx": (_std.CRXGate, 1, 2),
+    "cry": (_std.CRYGate, 1, 2),
+    "crz": (_std.CRZGate, 1, 2),
+    "ch": (_std.CHGate, 0, 2),
+    "swap": (_std.SwapGate, 0, 2),
+    "ccx": (_std.CCXGate, 0, 3),
+    "cswap": (_std.CSwapGate, 0, 3),
+    "cu": (_std.CUGate, 4, 2),
+    "CX": (_std.CXGate, 0, 2),
+    "phase": (_std.PhaseGate, 1, 1),
+    "cphase": (_std.CPhaseGate, 1, 2),
+    "id": (
+        lambda: _std.UGate(0, 0, 0),  # Qiskit's "id" gate does not strictly have equal semantics.
+        0,
+        1,
+    ),
+    "u1": (_std.U1Gate, 1, 1),
+    "u2": (_std.U2Gate, 2, 1),
+    "u3": (_std.U3Gate, 3, 1),
+}
 
 
 def _escape_qasm2(name: str) -> str:
