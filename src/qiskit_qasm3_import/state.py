@@ -117,8 +117,6 @@ class SymbolTable:
         target[symbol.name] = symbol
 
     def globals(self):
-        if self.global_symbols is None:
-            return []
         return self.global_symbols.values()
 
 
