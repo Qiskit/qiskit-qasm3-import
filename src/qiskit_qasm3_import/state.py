@@ -127,9 +127,9 @@ class State:
         # We use the entire source, because at the moment, that's what all the error messages
         # expect; the nodes have references to the complete source in their spans.
         self.source = source
-        self.init_inner()
+        self._init_inner()
 
-    def init_inner(
+    def _init_inner(
         self,
         scope: Scope = None,
         state_in: "State" = None,
@@ -151,11 +151,13 @@ class State:
 
     def gate_scope(self):
         """Get a new state for entry to a "gate" scope."""
-        return State().init_inner(Scope.GATE, self, None, None)
+        # pylint: disable=protected-access
+        return State()._init_inner(Scope.GATE, self, None, None)
 
     def local_scope(self):
         """Get a new state on entry to a local block scope."""
-        return State().init_inner(Scope.LOCAL, self, self.circuit, self._unique)
+        # pylint: disable=protected-access
+        return State()._init_inner(Scope.LOCAL, self, self.circuit, self._unique)
 
     def unique_name(self, prefix=None):
         """Get a name that is not defined in the current scope."""
