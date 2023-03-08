@@ -65,6 +65,13 @@ class AddressingMode:
 
 
 class SymbolTable:
+    """
+    Slots:
+       _symbols (dict): A dict of non-global symbols
+       _scope (Scope): The scope associated with this symbol table
+       _base (SymbolTable): The parent to this symbol table
+       _global_symbols (dict): A dict of global symbols
+    """
     __slots__ = ("_symbols", "_scope", "_base", "_global_symbols")
 
     def __init__(self, scope: Scope, base: Optional["SymbolTable"] = None):
@@ -116,6 +123,7 @@ class SymbolTable:
         target[symbol.name] = symbol
 
     def globals(self):
+        """Return an iterator over the global symbols."""
         return self._global_symbols.values()
 
 
