@@ -12,7 +12,7 @@ class Scope(enum.Enum):
     GATE = enum.auto()
     FUNCTION = enum.auto()
     LOCAL = enum.auto()
-    CALIBRATION = enum.auto()
+    CALIBRATION = enum.auto()  # Unused
     BUILTIN = enum.auto()
     # NONE scope is for when we're adding an implicit symbol to the table, but it shouldn't actually
     # be accessible by anything outside the context that defines it.  We might need to do this in

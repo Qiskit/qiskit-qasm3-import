@@ -99,18 +99,18 @@ class GateBuilder:
     def __init__(
         self, name: str, definition: QuantumCircuit, order: Optional[Sequence[Parameter]] = None
     ):
-        self.name = name
-        self.definition = definition
-        self.order = tuple(self.definition.parameters) if order is None else tuple(order)
+        self._name = name
+        self._definition = definition
+        self._order = tuple(self._definition.parameters) if order is None else tuple(order)
 
     def __call__(self, *parameters):
-        if len(parameters) != len(self.order):
+        if len(parameters) != len(self._order):
             raise ConversionError("incorrect number of parameters in call")
-        out = Gate(self.name, self.definition.num_qubits, parameters)
+        out = Gate(self._name, self._definition.num_qubits, parameters)
         if parameters:
-            out._definition = self.definition.assign_parameters(dict(zip(self.order, parameters)))
+            out._definition = self._definition.assign_parameters(dict(zip(self._order, parameters)))
         else:
-            out._definition = self.definition.copy()
+            out._definition = self._definition.copy()
         return out
 
 
@@ -337,7 +337,7 @@ class ConvertVisitor(QASMVisitor[State]):
             raise_from_node(node, f"gate '{node.name.name}' is not defined.")
         if not isinstance(gate_symbol.type, types.Gate):
             message = f"'{node.name.name}' is a '{gate_symbol.type.pretty()}', not a gate."
-            if (span := getattr(gate_symbol.definer, "span", None)) is not None:
+            if (span := gate_symbol.definer.span) is not None:
                 message += f" Definition on line {span.start_line}"
             raise_from_node(node, message)
         gate_builder = gate_symbol.data

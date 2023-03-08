@@ -67,12 +67,12 @@ class ValueResolver(QASMVisitor):
     :class:`.State` created in :meth:`.ConvertVisitor.convert()`.
     """
 
-    __slots__ = ("context",)
+    __slots__ = ("_context",)
 
     # pylint: disable=no-self-use
 
     def __init__(self, context: State):
-        self.context = context
+        self._context = context
 
     def resolve(self, node: ast.Expression) -> Tuple[Any, types.Type]:
         """The entry point to the resolver, resolving the AST node into a 2-tuple of a relevant
@@ -90,7 +90,7 @@ class ValueResolver(QASMVisitor):
         raise_from_node(node, f"'{node.__class__.__name__}' cannot be resolved into a Qiskit value")
 
     def visit_Identifier(self, node: ast.Identifier):
-        cxt = self.context
+        cxt = self._context
         if (symbol := cxt.symbol_table.get(node.name, node)) is not None:
             return symbol.data, symbol.type
         if not is_physical(node.name):
