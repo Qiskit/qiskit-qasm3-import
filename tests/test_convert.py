@@ -308,6 +308,15 @@ def test_only_global_declarations():
         parse(source)
 
 
+def test_no_rebinding_in_global_scope():
+    source = """
+        include 'stdgates.inc';
+        qubit p;
+    """
+    with pytest.raises(ConversionError, match="already inserted in symbol table"):
+        parse(source)
+
+
 def test_basic_gate_definition():
     source = """
         include 'stdgates.inc';
@@ -533,13 +542,13 @@ def test_gate_broadcast():
     source = """
         include "stdgates.inc";
         qubit[2] q;
-        qubit[2] p;
-        cx q[0], p;
-        cx q, p;
-        cx q, p[0];
+        qubit[2] p0;
+        cx q[0], p0;
+        cx q, p0;
+        cx q, p0[0];
     """
     qc = parse(source)
-    q, p = QuantumRegister(2, "q"), QuantumRegister(2, "p")
+    q, p = QuantumRegister(2, "q"), QuantumRegister(2, "p0")
     expected = QuantumCircuit(q, p)
     expected.cx(q[0], p)
     expected.cx(q, p)
@@ -553,8 +562,8 @@ def test_gate_broadcast_rejects_bad_lengths():
     source = """
         include "stdgates.inc";
         qubit[2] q;
-        qubit[3] p;
-        cx q, p;
+        qubit[3] p0;
+        cx q, p0;
     """
     with pytest.raises(ConversionError, match="mismatched lengths in gate broadcast"):
         parse(source)
