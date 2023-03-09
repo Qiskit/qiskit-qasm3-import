@@ -72,6 +72,7 @@ class SymbolTable:
        _base (SymbolTable): The parent to this symbol table
        _global_symbols (dict): A dict of global symbols
     """
+
     __slots__ = ("_symbols", "_scope", "_base", "_global_symbols")
 
     def __init__(self, scope: Scope, base: Optional["SymbolTable"] = None):
@@ -122,7 +123,10 @@ class SymbolTable:
         target = self._global_symbols if symbol.type == types.HardwareQubit() else self._symbols
         if (other_symbol := target.get(symbol.name, None)) is not None:
             if other_symbol.name == symbol.name and other_symbol.scope == other_symbol.scope:
-                raise_from_node(symbol.definer, f"Symbol '{symbol.name}' already inserted in symbol table in this scope: {symbol.scope}")
+                raise_from_node(
+                    symbol.definer,
+                    f"Symbol '{symbol.name}' already inserted in symbol table in this scope: {symbol.scope}",
+                )
         target[symbol.name] = symbol
 
     def globals(self):
