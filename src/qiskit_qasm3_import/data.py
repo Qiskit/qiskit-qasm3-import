@@ -39,3 +39,6 @@ class Symbol:
         self.type = type
         self.scope = scope
         self.definer = definer
+
+    def __repr__(self):
+        return f"Symbol(name={self.name}, data={self.data}, type={self.type}, scope={self.scope})"

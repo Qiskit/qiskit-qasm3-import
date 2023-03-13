@@ -63,6 +63,12 @@ class AddressingMode:
             )
         self._state = self._VIRTUAL
 
+    def is_physical(self):
+        return self._state is self._PHYSICAL
+
+    def __repr__(self):
+        return f"AddressingMode({self._state})"
+
 
 class SymbolTable:
     """
