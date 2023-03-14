@@ -1,5 +1,6 @@
+import re
 import enum
-from typing import Optional
+from typing import Optional, Union
 import itertools
 import math
 
@@ -26,6 +27,16 @@ _BUILTINS = {
     "euler": Symbol("euler", math.e, types.Float(const=True), Scope.BUILTIN),
     "ℇ": Symbol("ℇ", math.e, types.Float(const=True), Scope.BUILTIN),
 }
+
+
+_PHYSICAL_QUBIT_RE = re.compile(r"\$\d+")
+
+
+def is_physical(name: Union[str, Symbol]):
+    "Return true if name is a valid identifier for a physical qubit."
+    if isinstance(name, Symbol):
+        name = name.name
+    return re.match(_PHYSICAL_QUBIT_RE, name) is not None
 
 
 class AddressingMode:
@@ -70,63 +81,84 @@ class AddressingMode:
         return f"AddressingMode({self._state})"
 
 
-class SymbolTable:
-    """
-    Slots:
-       _symbols (dict): A dict of non-global symbols
-       _scope (Scope): The scope associated with this symbol table
-       _base (SymbolTable): The parent to this symbol table
-       _global_symbols (dict): A dict of global symbols
-    """
-
-    __slots__ = ("_symbols", "_scope", "_base", "_global_symbols")
-
-    def __init__(self, scope: Scope, base: Optional["SymbolTable"] = None):
-        self._symbols = {}
-        self._scope = scope
-        self._base = base
-        self._global_symbols = base._global_symbols if base is not None else _BUILTINS.copy()
-
-    def __contains__(self, name: str):
-        return name in (self._symbols, self._global_symbols) or (
-            self._base is not None and name in self._base._symbols
-        )
-
-    def get(self, name: str, node=None):
-        """Lookup symbol `name`
-
-        Return `None` if no symbol is found. Raise an exception if the symbol is
-        inaccessible in the scope of this table.
-        """
-        if (symbol := self._symbols.get(name, None)) is not None:
-            return symbol
-        if self._base is not None:
-            if (symbol := self._base.get(name, None)) is None:
-                return None
-            return self._check_visible(symbol, node)
-        return self._global_symbols.get(name, None)
-
-    def _check_visible(self, symbol, node):
-        if (
-            symbol.scope is Scope.BUILTIN
-            or self._scope is not Scope.GATE
-            or symbol.scope is not Scope.GLOBAL
+def _check_visible(symbol, context_scope, node):
+    if symbol.scope is Scope.BUILTIN:
+        return symbol
+    if context_scope is Scope.GATE and isinstance(symbol.type, types.HardwareQubit):
+        raise PhysicalQubitInGateError(node.name, node)
+    if not (context_scope is Scope.GATE and symbol.scope is Scope.GLOBAL):
+        return symbol
+    if context_scope is Scope.GATE:
+        if isinstance(symbol.type, types.Gate) or (
+            isinstance(
+                symbol.type, (types.Int, types.Uint, types.Float, types.Angle, types.Duration)
+            )
+            and symbol.type.const
         ):
             return symbol
-        if self._scope is Scope.GATE:
-            if isinstance(symbol.type, types.Gate) or (
-                isinstance(
-                    symbol.type, (types.Int, types.Uint, types.Float, types.Angle, types.Duration)
-                )
-                and symbol.type.const
-            ):
-                return symbol
-        if isinstance(symbol.type, types.HardwareQubit):
+    if isinstance(symbol.type, types.HardwareQubit):
+        raise PhysicalQubitInGateError(node.name, node)
+    raise_from_node(node, f"Symbol {symbol.name} is not visible in the scope of a gate")
+
+
+class SymbolTable:
+    __slots__ = ("scope", "symbols")
+
+    def __init__(self, scope, symbols=None):
+        self.scope = scope
+        self.symbols = symbols if symbols is not None else {}
+
+
+class SymbolTables:
+    __slots__ = ("_stack",)
+
+    def __init__(self):
+        self._stack = []
+        self.push(SymbolTable(Scope.GLOBAL, _BUILTINS.copy()))
+
+    def __len__(self):
+        return len(self._stack)
+
+    def __getitem__(self, n):
+        return self._stack[n]
+
+    def __contains__(self, name: str):
+        for symbol_table in self._stack:
+            if name in symbol_table.symbols:
+                return True
+        return False
+
+    def get(self, name: str, node=None):
+        top_scope = self[len(self) - 1].scope
+        if top_scope is Scope.GATE and is_physical(name):
             raise PhysicalQubitInGateError(node.name, node)
-        raise_from_node(node, f"Symbol {symbol.name} is not visible in the scope of a gate")
+        for symbol_table in reversed(self._stack):
+            if (symbol := symbol_table.symbols.get(name, None)) is not None:
+                return _check_visible(symbol, top_scope, node)
+        return None
+
+    @property
+    def _global_symbol_table(self):
+        return self[0]
+
+    @property
+    def _top_symbol_table(self):
+        return self[len(self) - 1]
+
+    def push(self, symbol_table: SymbolTable):
+        if symbol_table.scope is Scope.GLOBAL and len(self) > 1:
+            raise RuntimeError("bad")
+        return self._stack.append(symbol_table)
+
+    def pop(self):
+        return self._stack.pop()
 
     def insert(self, symbol):
-        target = self._global_symbols if symbol.type == types.HardwareQubit() else self._symbols
+        target = (
+            self._global_symbol_table.symbols
+            if symbol.scope is Scope.GLOBAL
+            else self._top_symbol_table.symbols
+        )
         if (other_symbol := target.get(symbol.name, None)) is not None:
             if other_symbol.name == symbol.name and other_symbol.scope == other_symbol.scope:
                 raise_from_node(
@@ -137,7 +169,12 @@ class SymbolTable:
 
     def globals(self):
         """Return an iterator over the global symbols."""
-        return self._global_symbols.values()
+        return self._global_symbol_table.symbols.values()
+
+    def _dump(self):
+        for n, table in enumerate(self._stack):
+            print(f"Table number {n}, {len(table)} syms, scope={table.scope}:")
+            print(table.symbols, "\n")
 
 
 class State:
@@ -150,7 +187,7 @@ class State:
                   translated, but rather an AST derived from the source is the input.
                   Instead, this source is used for diagnostics.
       circuit (qiskit.circuit.QuantumCircuit): The output of the translation.
-      symbol_table (SymbolTable): A structure that tracks the symbols (e.g. identifiers) that
+      symbol_table (SymbolTables): A structure that tracks the symbols (e.g. identifiers) that
                   have been encountered along with some information about them.
       _unique (function) : A function that returns unique symbol names.
       addressing_mode: A structure that tracks the state of the addressing mode; either unknown,
@@ -174,10 +211,11 @@ class State:
     ):
         self.scope = scope if scope is not None else Scope.GLOBAL
         if state_in is None:
-            self.symbol_table = SymbolTable(Scope.GLOBAL)
+            self.symbol_table = SymbolTables()
             self.addressing_mode = AddressingMode()
         else:
-            self.symbol_table = SymbolTable(scope, state_in.symbol_table)
+            self.symbol_table = state_in.symbol_table
+            self.symbol_table.push(SymbolTable(scope))
             self.addressing_mode = state_in.addressing_mode
             self._source = state_in._source
         self.circuit = circuit if circuit is not None else QuantumCircuit()
@@ -185,18 +223,33 @@ class State:
 
         return self
 
-    def gate_scope(self):
-        """Get a new state for entry to a "gate" scope."""
-        # pylint: disable=protected-access
-        return State()._init_inner(Scope.GATE, self, None, None)
-
-    def local_scope(self):
-        """Get a new state on entry to a local block scope."""
-        # pylint: disable=protected-access
-        return State()._init_inner(Scope.LOCAL, self, self.circuit, self._unique)
-
     def unique_name(self, prefix=None):
         """Get a name that is not defined in the current scope."""
         while (name := f"{prefix}{next(self._unique)}") in self.symbol_table:
             pass
         return name
+
+
+class LocalScope:
+    def __init__(self, context):
+        self._local_scope = State.__new__(State)._init_inner(
+            Scope.LOCAL, context, context.circuit, context._unique
+        )
+
+    def __enter__(self):
+        return self._local_scope
+
+    def __exit__(self, _exc_type, _exc_value, _traceback):
+        self._local_scope.symbol_table.pop()
+
+
+class GateScope:
+    def __init__(self, context):
+        self._gate_scope = State.__new__(State)._init_inner(Scope.GATE, context, None, None)
+
+    def __enter__(self):
+
+        return self._gate_scope
+
+    def __exit__(self, _exc_type, _exc_value, _traceback):
+        self._gate_scope.symbol_table.pop()

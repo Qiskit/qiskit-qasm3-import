@@ -30,8 +30,8 @@ from qiskit.circuit.library import standard_gates as _std
 from . import types
 from .data import Scope, Symbol
 from .exceptions import ConversionError, raise_from_node
-from .expression import ValueResolver, resolve_condition, is_physical
-from .state import State, SymbolTable
+from .expression import ValueResolver, resolve_condition
+from .state import State, SymbolTables, LocalScope, GateScope, is_physical
 
 _QASM2_IDENTIFIER = re.compile(r"[a-z]\w*", flags=re.ASCII)
 
@@ -90,7 +90,7 @@ def _escape_qasm2(name: str) -> str:
 
 # A hardware-qubit symbol has the form '$' followed by digits.
 # The digits are the identifier used by backends.
-def hardware_qubit_map(symbol_table: SymbolTable):
+def hardware_qubit_map(symbol_table: SymbolTables):
     "Return a `dict` mapping `Qubit` instances to `int`s representing physical qubit identifiers."
     return {sym.data: int(sym.name[1:]) for sym in symbol_table.globals() if is_physical(sym)}
 
@@ -105,7 +105,10 @@ class GateBuilder:
 
     def __call__(self, *parameters):
         if len(parameters) != len(self._order):
-            raise ConversionError("incorrect number of parameters in call")
+            raise ConversionError(
+                "incorrect number of parameters in call. Expecting "
+                f" {len(self._order)}, got {len(parameters)}."
+            )
         out = Gate(self._name, self._definition.num_qubits, parameters)
         if parameters:
             out._definition = self._definition.assign_parameters(dict(zip(self._order, parameters)))
@@ -308,19 +311,19 @@ class ConvertVisitor(QASMVisitor[State]):
         return context
 
     def visit_QuantumGateDefinition(self, node: ast.QuantumGateDefinition, context: State) -> State:
-        inner = context.gate_scope()
-        parameters = [Parameter(name.name) for name in node.arguments]
-        for parameter in parameters:
-            inner.symbol_table.insert(
-                Symbol(parameter.name, parameter, types.Angle(), Scope.GATE, node)
-            )
-            self._add_circuit_parameter(parameter, inner)
-        bits = [Qubit() for _ in node.qubits]
-        inner.circuit.add_bits(bits)
-        for name, bit in zip(node.qubits, bits):
-            inner.symbol_table.insert(Symbol(name.name, bit, types.Qubit(), Scope.GATE, node))
-        for statement in node.body:
-            inner = self.visit(statement, inner)
+        with GateScope(context) as inner:
+            parameters = [Parameter(name.name) for name in node.arguments]
+            for parameter in parameters:
+                inner.symbol_table.insert(
+                    Symbol(parameter.name, parameter, types.Angle(), Scope.GATE, node)
+                )
+                self._add_circuit_parameter(parameter, inner)
+            bits = [Qubit() for _ in node.qubits]
+            inner.circuit.add_bits(bits)
+            for name, bit in zip(node.qubits, bits):
+                inner.symbol_table.insert(Symbol(name.name, bit, types.Qubit(), Scope.GATE, node))
+            for statement in node.body:
+                self.visit(statement, inner)
         return self._define_gate(
             node.name.name,
             GateBuilder(node.name.name, inner.circuit),
@@ -450,23 +453,23 @@ class ConvertVisitor(QASMVisitor[State]):
     def visit_BranchingStatement(self, node: ast.BranchingStatement, context: State) -> State:
         condition = self._resolve_condition(node.condition, context)
         with context.circuit.if_test(condition) as else_:
-            inner = context.local_scope()
-            for statement in node.if_block:
-                inner = self.visit(statement, inner)
+            with LocalScope(context) as inner:
+                for statement in node.if_block:
+                    self.visit(statement, inner)
         if not node.else_block:
             return context
         with else_:
-            inner = context.local_scope()
-            for statement in node.else_block:
-                inner = self.visit(statement, inner)
+            with LocalScope(context) as inner:
+                for statement in node.else_block:
+                    self.visit(statement, inner)
         return context
 
     def visit_WhileLoop(self, node: ast.WhileLoop, context: State) -> State:
         condition = self._resolve_condition(node.while_condition, context)
         with context.circuit.while_loop(condition):
-            inner = context.local_scope()
-            for statement in node.block:
-                inner = self.visit(statement, inner)
+            with LocalScope(context) as inner:
+                for statement in node.block:
+                    self.visit(statement, inner)
         return context
 
     def visit_ForInLoop(self, node: ast.ForInLoop, context: State) -> State:
@@ -488,13 +491,13 @@ class ConvertVisitor(QASMVisitor[State]):
             )
         var_type = types.Int() if isinstance(node.type, ast.IntType) else types.Uint()
         with context.circuit.for_loop(indexset) as parameter:
-            inner = context.local_scope()
-            name = node.identifier.name
-            symbol = Symbol(name, parameter, var_type, Scope.LOCAL, node)
-            inner.symbol_table.insert(symbol)
-            self._add_circuit_parameter(parameter, inner)
-            for statement in node.block:
-                inner = self.visit(statement, inner)
+            with LocalScope(context) as inner:
+                name = node.identifier.name
+                symbol = Symbol(name, parameter, var_type, Scope.LOCAL, node)
+                inner.symbol_table.insert(symbol)
+                self._add_circuit_parameter(parameter, inner)
+                for statement in node.block:
+                    self.visit(statement, inner)
         return context
 
     def visit_DelayInstruction(self, node: ast.DelayInstruction, context: State) -> State:

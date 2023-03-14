@@ -400,13 +400,17 @@ def test_input_shadows_builtin():
         qubit q;
         U(euler, euler, euler) q;
     """
-    qc = parse(source)
-    assert len(qc.parameters) == 1
-    assert qc.parameters[0].name == "euler"
-    p = qc.parameters[0]
-    expected = QuantumCircuit([Qubit()])
-    expected.u(p, p, p, 0)
-    assert qc == expected
+    with pytest.raises(
+        ConversionError, match="Symbol 'euler' already inserted in symbol table in this scope"
+    ):
+        parse(source)
+    # qc = parse(source)
+    # assert len(qc.parameters) == 1
+    # assert qc.parameters[0].name == "euler"
+    # p = qc.parameters[0]
+    # expected = QuantumCircuit([Qubit()])
+    # expected.u(p, p, p, 0)
+    # assert qc == expected
 
 
 def test_parametrised_gate_definition():

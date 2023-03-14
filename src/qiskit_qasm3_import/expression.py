@@ -17,7 +17,6 @@ scope, rather than trying to build a whole new internal IR to handle everything 
 
 __all__ = ["ValueResolver", "resolve_condition"]
 
-import re
 from typing import Any, Iterable, Tuple, Union
 
 from openqasm3 import ast
@@ -25,21 +24,12 @@ from openqasm3.visitor import QASMVisitor
 from qiskit.circuit import Clbit, Qubit
 
 from . import types
-from .exceptions import raise_from_node, PhysicalQubitInGateError
+from .exceptions import raise_from_node
 from .data import Symbol, Scope
-from .state import State
+from . import state
 
 
 _IntegerT = Union[types.Never, types.Int, types.Uint]
-
-_PHYSICAL_QUBIT_RE = re.compile(r"\$\d+")
-
-
-def is_physical(name: Union[str, Symbol]):
-    "Return true if name is a valid identifier for a physical qubit."
-    if isinstance(name, Symbol):
-        name = name.name
-    return re.match(_PHYSICAL_QUBIT_RE, name) is not None
 
 
 def join_integer_types(left: _IntegerT, right: _IntegerT) -> _IntegerT:
@@ -71,7 +61,7 @@ class ValueResolver(QASMVisitor):
 
     # pylint: disable=no-self-use
 
-    def __init__(self, context: State):
+    def __init__(self, context: state.State):
         self._context = context
 
     def resolve(self, node: ast.Expression) -> Tuple[Any, types.Type]:
@@ -93,10 +83,9 @@ class ValueResolver(QASMVisitor):
         cxt = self._context
         if (symbol := cxt.symbol_table.get(node.name, node)) is not None:
             return symbol.data, symbol.type
-        if not is_physical(node.name):
+        if not state.is_physical(node.name):
             raise_from_node(node, f"Undefined symbol '{node.name}'.")
-        if cxt.scope is Scope.GATE:
-            raise PhysicalQubitInGateError(node.name, node)
+
         cxt.addressing_mode.set_physical_mode(node)
         bit = Qubit()
         cxt.circuit.add_bits([bit])
@@ -306,7 +295,7 @@ class ValueResolver(QASMVisitor):
 
 
 def resolve_condition(
-    node: ast.Expression, context: State
+    node: ast.Expression, context: state.State
 ) -> Union[Tuple[Clbit, bool], Tuple[Iterable[Clbit], int]]:
     """A resolver for conditions that can be converted into Qiskit's very basic equality form
     of either ``Clbit == bool`` or ``ClassicalRegister == int``.
