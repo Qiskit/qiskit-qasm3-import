@@ -201,28 +201,41 @@ class State:
         # We use the entire source, because at the moment, that's what all the error messages
         # expect; the nodes have references to the complete source in their spans.
         self._source = source
-        self._init_inner()
+        self.scope = Scope.GLOBAL
+        self.symbol_table = SymbolTables()
+        self.addressing_mode = AddressingMode()
+        self.circuit = QuantumCircuit()
+        self._unique = (f"_{x}" for x in itertools.count())
+        self._finish_init()
 
-    def _init_inner(
-        self,
-        scope: Scope = None,
-        state_in: "State" = None,
-        circuit=None,
-        unique=None,
-    ):
-        self.scope = scope if scope is not None else Scope.GLOBAL
-        if state_in is None:
-            self.symbol_table = SymbolTables()
-            self.addressing_mode = AddressingMode()
-        else:
-            self.symbol_table = state_in.symbol_table
-            self.symbol_table.push(SymbolTable(scope))
-            self.addressing_mode = state_in.addressing_mode
-            self._source = state_in._source
-        self.circuit = circuit if circuit is not None else QuantumCircuit()
-        self._unique = unique if unique is not None else (f"_{x}" for x in itertools.count())
+    def _finish_init(self):
+        self.circuit = QuantumCircuit()
+        self._unique = (f"_{x}" for x in itertools.count())
 
-        return self
+    @classmethod
+    def _new_scope(cls, scope, context):
+        new_context = State.__new__(State)
+        new_context.scope = scope
+        new_context.symbol_table = context.symbol_table
+        new_context.symbol_table.push(SymbolTable(scope))
+        new_context.addressing_mode = context.addressing_mode
+        new_context._source = context._source
+        return new_context
+
+    @classmethod
+    def new_with_local_scope(cls, context):
+        """Return a copy of `context` modified to include a new local scope on the stack."""
+        new_context = State._new_scope(Scope.LOCAL, context)
+        new_context.circuit = context.circuit
+        new_context._unique = context._unique  # pylint: disable=protected-access
+        return new_context
+
+    @classmethod
+    def new_with_gate_scope(cls, context):
+        """Return a copy of `context` modified to include a new gate scope on the stack."""
+        new_context = State._new_scope(Scope.GATE, context)
+        new_context._finish_init()
+        return new_context
 
     def unique_name(self, prefix=None):
         """Get a name that is not defined in the current scope."""
@@ -231,15 +244,11 @@ class State:
         return name
 
 
-# TODO: clean up the construction of a context with a new scope.
-# The current method grew somewhat by accretion.
 class LocalScope:
-    def __init__(self, context):
-        self._local_scope = State.__new__(State)._init_inner(
-            Scope.LOCAL, context, context.circuit, context._unique
-        )
+    def __init__(self, context: State):
+        self._local_scope = State.new_with_local_scope(context)
 
-    def __enter__(self):
+    def __enter__(self) -> State:
         return self._local_scope
 
     def __exit__(self, _exc_type, _exc_value, _traceback):
@@ -247,11 +256,10 @@ class LocalScope:
 
 
 class GateScope:
-    def __init__(self, context):
-        self._gate_scope = State.__new__(State)._init_inner(Scope.GATE, context, None, None)
+    def __init__(self, context: State):
+        self._gate_scope = State.new_with_gate_scope(context)
 
-    def __enter__(self):
-
+    def __enter__(self) -> State:
         return self._gate_scope
 
     def __exit__(self, _exc_type, _exc_value, _traceback):
