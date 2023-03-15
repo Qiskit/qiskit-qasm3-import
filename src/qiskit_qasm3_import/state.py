@@ -80,6 +80,7 @@ class AddressingMode:
     def __repr__(self):
         return f"AddressingMode({self._state})"
 
+
 # TODO: clean this up
 def _check_visible(symbol, context_scope, node):
     if symbol.scope is Scope.BUILTIN:
@@ -230,8 +231,8 @@ class State:
         return name
 
 
- # TODO: clean up the construction of a context with a new scope.
- # The current method grew somewhat by accretion.
+# TODO: clean up the construction of a context with a new scope.
+# The current method grew somewhat by accretion.
 class LocalScope:
     def __init__(self, context):
         self._local_scope = State.__new__(State)._init_inner(
