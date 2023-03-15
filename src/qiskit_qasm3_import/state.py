@@ -149,7 +149,7 @@ class SymbolTables:
 
     def push(self, symbol_table: SymbolTable):
         if symbol_table.scope is Scope.GLOBAL and len(self) > 1:
-            raise RuntimeError("bad")
+            raise RuntimeError("Only one global symbol table may be pushed to the stack.")
         return self._stack.append(symbol_table)
 
     def pop(self):
