@@ -18,13 +18,3 @@ class ConversionError(Exception):
 def raise_from_node(node: ast.QASMNode, message: str) -> NoReturn:
     """Raise a :exc:`.ConversionError` caused by the given `node`."""
     raise ConversionError(message, node)
-
-
-class PhysicalQubitInGateError(ConversionError):
-    def __init__(self, name: str, node=None):
-        self.name = name
-        msg = (
-            f"Illegal qubit reference '{name}'. References to hardware "
-            "qubits not allowed in gate definitions."
-        )
-        super().__init__(msg, node)

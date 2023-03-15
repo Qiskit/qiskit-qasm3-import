@@ -10,7 +10,7 @@ from qiskit.circuit.library import standard_gates as _std
 
 from . import types
 from .data import Scope, Symbol
-from .exceptions import raise_from_node, PhysicalQubitInGateError
+from .exceptions import raise_from_node
 
 
 _BUILTINS = {
@@ -81,25 +81,22 @@ class AddressingMode:
         return f"AddressingMode({self._state})"
 
 
-# TODO: clean this up
 def _check_visible(symbol, context_scope, node):
-    if symbol.scope is Scope.BUILTIN:
-        return symbol
-    if context_scope is Scope.GATE and isinstance(symbol.type, types.HardwareQubit):
-        raise PhysicalQubitInGateError(node.name, node)
-    if not (context_scope is Scope.GATE and symbol.scope is Scope.GLOBAL):
-        return symbol
-    if context_scope is Scope.GATE:
-        if isinstance(symbol.type, types.Gate) or (
-            isinstance(
-                symbol.type, (types.Int, types.Uint, types.Float, types.Angle, types.Duration)
+    if (
+        symbol.scope is Scope.GLOBAL
+        and context_scope is Scope.GATE
+        and not (
+            isinstance(symbol.type, types.Gate)
+            or (
+                isinstance(
+                    symbol.type, (types.Int, types.Uint, types.Float, types.Angle, types.Duration)
+                )
+                and symbol.type.const
             )
-            and symbol.type.const
-        ):
-            return symbol
-    if isinstance(symbol.type, types.HardwareQubit):
-        raise PhysicalQubitInGateError(node.name, node)
-    raise_from_node(node, f"Symbol {symbol.name} is not visible in the scope of a gate")
+        )
+    ):
+        raise_from_node(node, f"Symbol {symbol.name} is not visible in the scope of a gate")
+    return symbol
 
 
 class SymbolTable:
@@ -132,7 +129,11 @@ class SymbolTables:
     def get(self, name: str, node=None):
         top_scope = self[len(self) - 1].scope
         if top_scope is Scope.GATE and is_physical(name):
-            raise PhysicalQubitInGateError(node.name, node)
+            raise_from_node(
+                node,
+                f"Illegal qubit reference '{name}'. References to hardware "
+                "qubits not allowed in gate definitions.",
+            )
         for symbol_table in reversed(self._stack):
             if (symbol := symbol_table.symbols.get(name, None)) is not None:
                 return _check_visible(symbol, top_scope, node)

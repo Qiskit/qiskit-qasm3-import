@@ -12,7 +12,7 @@ from qiskit.circuit import (
 )
 from qiskit.quantum_info import Operator
 
-from qiskit_qasm3_import import parse, ConversionError, PhysicalQubitInGateError
+from qiskit_qasm3_import import parse, ConversionError
 
 
 def test_readme_circuit():
@@ -1050,7 +1050,7 @@ def test_reject_hardware_qubit_in_gate_body_1():
            h $0;
         }
     """
-    with pytest.raises(PhysicalQubitInGateError):
+    with pytest.raises(ConversionError, match="hardware qubits not allowed in gate definitions."):
         parse(source)
 
 
@@ -1063,7 +1063,7 @@ def test_reject_hardware_qubit_in_gate_body_2():
            h $0;
         }
     """
-    with pytest.raises(PhysicalQubitInGateError):
+    with pytest.raises(ConversionError, match="hardware qubits not allowed in gate definitions."):
         parse(source)
 
 
