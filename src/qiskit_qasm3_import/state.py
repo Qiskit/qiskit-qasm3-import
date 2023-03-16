@@ -55,7 +55,9 @@ class AddressingMode:
     def set_physical_mode(self, node):
         """Set the addressing mode to physical. On success return `True`, otherwise raise an
         exception."""
-        if self._state == self._VIRTUAL:
+        if self._state is self._PHYSICAL:  # Fast exit for most common case
+            return
+        if self._state is self._VIRTUAL:
             raise_from_node(
                 node,
                 "Physical qubit referenced in virtual addressing mode. Mixing "
@@ -66,7 +68,9 @@ class AddressingMode:
     def set_virtual_mode(self, node):
         """Set the addressing mode to virtual.
         On success return `True`, otherwise raise an exception."""
-        if self._state == self._PHYSICAL:
+        if self._state is self._VIRTUAL:
+            return
+        if self._state is self._PHYSICAL:
             raise_from_node(
                 node,
                 "Virtual qubit declared in physical addressing mode. Mixing modes not currently "
