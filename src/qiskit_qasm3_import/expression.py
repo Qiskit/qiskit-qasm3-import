@@ -17,7 +17,7 @@ scope, rather than trying to build a whole new internal IR to handle everything 
 
 __all__ = ["ValueResolver", "resolve_condition"]
 
-from typing import Any, Iterable, Mapping, Tuple, Union, cast
+from typing import Any, Iterable, Tuple, Union, cast
 
 from openqasm3 import ast
 from openqasm3.visitor import QASMVisitor
