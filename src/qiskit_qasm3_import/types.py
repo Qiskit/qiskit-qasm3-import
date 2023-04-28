@@ -110,6 +110,17 @@ class Qubit(Type):
 
 
 @typing.final
+class HardwareQubit(Type):
+    """A hardware qubit.
+    This corresponds a hardware qubits referenced in Terra's :class:`~qiskit.transpiler.TranspilerLayout`."""
+
+    __slots__ = ()
+
+    def pretty(self):
+        return "hardware qubit"
+
+
+@typing.final
 class Int(Type):
     """An integer value.  This is generally only encountered as a constant and so is represented by
     a Python integer, but can also be the type of the Qiskit :class:`~qiskit.circuit.Parameter` used

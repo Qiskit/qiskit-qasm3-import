@@ -21,11 +21,12 @@ from typing import Any, Iterable, Mapping, Tuple, Union, cast
 
 from openqasm3 import ast
 from openqasm3.visitor import QASMVisitor
-from qiskit.circuit import Clbit
+from qiskit.circuit import Clbit, Qubit
 
 from . import types
 from .exceptions import raise_from_node
-from .data import Symbol
+from .data import Symbol, Scope
+from . import state
 
 
 _IntegerT = Union[types.Never, types.Int, types.Uint]
@@ -66,23 +67,25 @@ class ValueResolver(QASMVisitor):
     here should resolve into a single Qiskit object (or occasionally a compound of such objects,
     like lists of bits).
 
-    These resolvers are intended to be short-lived.  Their instance state is the symbols that are
-    available to them.  There is no per-run state tracked."""
+    These resolvers are intended to be short-lived. Their instance state is the instance of
+    :class:`.State` created in :meth:`.ConvertVisitor.convert()`.
+    """
 
-    __slots__ = ("symbols",)
+    __slots__ = ("_context",)
 
     # pylint: disable=no-self-use
 
-    def __init__(self, symbols: Mapping[str, Symbol]):
-        self.symbols = symbols
+    def __init__(self, context: state.State):
+        self._context = context
 
     def resolve(self, node: ast.Expression) -> Tuple[Any, types.Type]:
         """The entry point to the resolver, resolving the AST node into a 2-tuple of a relevant
         Qiskit type, and the :class:`.Type` that it is an instance of."""
+
         return self.visit(node)
 
     def visit(self, node: ast.QASMNode, context: None = None) -> Tuple[Any, types.Type]:
-        value, type = super().visit(node, context)
+        value, type = super().visit(node)
         if isinstance(type, types.Error):
             raise_from_node(node, "type error")
         return value, type
@@ -91,10 +94,17 @@ class ValueResolver(QASMVisitor):
         raise_from_node(node, f"'{node.__class__.__name__}' cannot be resolved into a Qiskit value")
 
     def visit_Identifier(self, node: ast.Identifier):
-        name = node.name
-        if name not in self.symbols:
-            raise_from_node(node, f"name '{name}' is not defined in this scope")
-        symbol = self.symbols[name]
+        cxt = self._context
+        if (symbol := cxt.symbol_table.get(node.name, node)) is not None:
+            return symbol.data, symbol.type
+        if not state.is_physical(node.name):
+            raise_from_node(node, f"Undefined symbol '{node.name}'.")
+
+        cxt.addressing_mode.set_physical_mode(node)
+        bit = Qubit()
+        cxt.circuit.add_bits([bit])
+        symbol = Symbol(node.name, bit, types.HardwareQubit(), Scope.GLOBAL, node)
+        cxt.symbol_table.insert(symbol)
         return symbol.data, symbol.type
 
     def visit_IntegerLiteral(self, node: ast.IntegerLiteral):
@@ -246,7 +256,6 @@ class ValueResolver(QASMVisitor):
             )
         if isinstance(indexer, ast.DiscreteSet):
             set_values, set_type = self.visit(indexer)
-            assert isinstance(set_type, types.Sequence)
             if not set_values:
                 return [], type(collection_type)(0)
             if not (isinstance(set_type.base, (types.Int, types.Uint)) and set_type.base.const):
@@ -278,7 +287,7 @@ class ValueResolver(QASMVisitor):
 
 
 def resolve_condition(
-    node: ast.Expression, symbols: Mapping[str, Symbol]
+    node: ast.Expression, context: state.State
 ) -> Union[Tuple[Clbit, bool], Tuple[Iterable[Clbit], int]]:
     """A resolver for conditions that can be converted into Qiskit's very basic equality form
     of either ``Clbit == bool`` or ``ClassicalRegister == int``.
@@ -286,7 +295,7 @@ def resolve_condition(
     This effectively just handles very special outer cases, then delegates the rest of the work to a
     :class:`.ValueResolver`."""
 
-    value_resolver = ValueResolver(symbols)
+    value_resolver = ValueResolver(context)
 
     if isinstance(node, ast.BinaryExpression):
         if node.op not in (ast.BinaryOperator["=="], ast.BinaryOperator["!="]):
