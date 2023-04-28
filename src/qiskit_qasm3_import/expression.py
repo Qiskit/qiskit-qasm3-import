@@ -17,7 +17,7 @@ scope, rather than trying to build a whole new internal IR to handle everything 
 
 __all__ = ["ValueResolver", "resolve_condition"]
 
-from typing import Any, Iterable, Tuple, Union
+from typing import Any, Iterable, Tuple, Union, cast
 
 from openqasm3 import ast
 from openqasm3.visitor import QASMVisitor
@@ -30,6 +30,7 @@ from . import state
 
 
 _IntegerT = Union[types.Never, types.Int, types.Uint]
+_NumericT = Union[types.Uint, types.Int, types.Float]
 
 
 def join_integer_types(left: _IntegerT, right: _IntegerT) -> _IntegerT:
@@ -46,6 +47,19 @@ def join_integer_types(left: _IntegerT, right: _IntegerT) -> _IntegerT:
     if isinstance(left, types.Uint) and isinstance(right, types.Uint):
         return types.Uint(const, size)
     return types.Int(const, size)
+
+
+def join_numeric_types(left: _NumericT, right: _NumericT) -> _NumericT:
+    const = left.const and right.const
+    if isinstance(left, types.Float) and isinstance(right, types.Float):
+        size = None if left.size is None or right.size is None else max((left.size, right.size))
+        return types.Float(const, size)
+    if isinstance(left, types.Float):
+        return types.Float(const, left.size)
+    if isinstance(right, types.Float):
+        return types.Float(const, right.size)
+    # Cast because this can't return the never type since neither of the inputs are never.
+    return cast(_NumericT, join_integer_types(left, right))
 
 
 class ValueResolver(QASMVisitor):
@@ -172,81 +186,59 @@ class ValueResolver(QASMVisitor):
             raise_from_node(node, f"unsupported binary operation '{node.op.name}'")
         lhs_value, lhs_type = self.visit(node.lhs)
         rhs_value, rhs_type = self.visit(node.rhs)
+        out_type: Union[None, types.Type] = None
+
+        # First, handle the simple implicit promotion rules for the standard numeric types (i.e. not
+        # angle).
+        numeric_t = (types.Int, types.Uint, types.Float)
+        if isinstance(lhs_type, numeric_t) and isinstance(rhs_type, numeric_t):
+            out_type = join_numeric_types(lhs_type, rhs_type)
 
         if node.op.name in ("+", "-"):
-            if isinstance(lhs_type, (types.Int, types.Uint)) and isinstance(
-                rhs_type, (types.Int, types.Uint)
-            ):
-                out_type = join_integer_types(lhs_type, rhs_type)
-                out_value = (
-                    lhs_value + rhs_value
-                    if node.op is ast.BinaryOperator["+"]
-                    else lhs_value - rhs_value
-                )
-                return out_value, out_type
-            if isinstance(lhs_type, (types.Float, types.Angle)) and type(lhs_type) == type(
-                rhs_type
-            ):
+            if isinstance(lhs_type, types.Angle) and isinstance(rhs_type, types.Angle):
                 const = lhs_type.const and rhs_type.const
                 size = (
                     None
                     if lhs_type.size is None or rhs_type.size is None
                     else max((lhs_type.size, rhs_type.size))
                 )
+                out_type = types.Angle(const, size)
+            if out_type is not None:
                 out_value = (
                     lhs_value + rhs_value
                     if node.op is ast.BinaryOperator["+"]
                     else lhs_value - rhs_value
                 )
-                return out_value, type(lhs_type)(const, size)
+                return out_value, out_type
 
         elif node.op is ast.BinaryOperator["/"]:
-            if isinstance(rhs_type, (types.Int, types.Uint)):
-                if isinstance(lhs_type, (types.Int, types.Uint)):
-                    return lhs_value // rhs_value, join_integer_types(lhs_type, rhs_type)
-                if isinstance(lhs_type, types.Float):
+            if isinstance(lhs_type, types.Angle):
+                if isinstance(rhs_type, (types.Int, types.Uint)):
                     const = lhs_type.const and rhs_type.const
-                    return lhs_value / rhs_value, types.Float(const, lhs_type.size)
-                if isinstance(lhs_type, types.Angle):
+                    out_type = types.Angle(const, lhs_type.size)
+                elif isinstance(rhs_type, types.Angle):
                     const = lhs_type.const and rhs_type.const
-                    return lhs_value / rhs_value, types.Angle(const, lhs_type.size)
-            elif isinstance(lhs_type, types.Angle):
-                if isinstance(rhs_type, types.Angle):
-                    const = lhs_type.const and rhs_type.const
-                    if const:
-                        return int(lhs_value / rhs_value), types.Uint(const=const)
-                    return lhs_value / rhs_value, types.Uint(const=const)
-                # Already handled integer rhs.
-            elif isinstance(lhs_type, types.Float):
-                if isinstance(rhs_type, types.Float):
-                    const = lhs_type.const and rhs_type.const
-                    size = (
-                        None
-                        if lhs_type.size is None or rhs_type.size is None
-                        else max((lhs_type.size, rhs_type.size))
-                    )
-                    return lhs_value / rhs_value, types.Float(const, size)
+                    out_type = types.Uint(const, None)
+            if out_type is not None:
+                out_value = (
+                    lhs_value // rhs_value
+                    if isinstance(out_type, (types.Int, types.Uint)) and out_type.const
+                    else lhs_value / rhs_value
+                )
+                return out_value, out_type
 
         elif node.op is ast.BinaryOperator["*"]:
-            if isinstance(rhs_type, (types.Int, types.Uint)):
-                if isinstance(lhs_type, (types.Int, types.Uint)):
-                    return lhs_value * rhs_value, join_integer_types(lhs_type, rhs_type)
-                if isinstance(lhs_type, types.Float):
-                    const = lhs_type.const and rhs_type.const
-                    return lhs_value * rhs_value, types.Float(const, lhs_type.size)
-                if isinstance(lhs_type, types.Angle):
-                    const = lhs_type.const and rhs_type.const
-                    return lhs_value * rhs_value, types.Angle(const, lhs_type.size)
-            elif isinstance(lhs_type, types.Float):
-                # Already handled integer rhs.
-                if isinstance(rhs_type, types.Float):
-                    const = lhs_type.const and rhs_type.const
-                    size = (
-                        None
-                        if lhs_type.size is None or rhs_type.size is None
-                        else max((lhs_type.size, rhs_type.size))
-                    )
-                    return lhs_value * rhs_value, types.Float(const, size)
+            if (
+                isinstance(lhs_type, types.Angle) and isinstance(rhs_type, (types.Int, types.Uint))
+            ) or (
+                isinstance(rhs_type, types.Angle) and isinstance(lhs_type, (types.Int, types.Uint))
+            ):
+                const = lhs_type.const and rhs_type.const
+                size = lhs_type.size if isinstance(lhs_type, types.Angle) else rhs_type.size
+                out_type = types.Angle(const, size)
+            if out_type is not None:
+                out_value = lhs_value * rhs_value
+                return out_value, out_type
 
         return None, types.Error()
 

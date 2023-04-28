@@ -284,9 +284,13 @@ def test_unary_minus_rejects_bad_types():
         ("+", types.Int(True, 4), types.Int(False, 3), types.Int(False, 4)),
         ("+", types.Int(True, 4), types.Int(False, None), types.Int(False, None)),
         ("+", types.Float(True, None), types.Float(False, 64), types.Float(False, None)),
+        ("+", types.Int(True, None), types.Float(True, 64), types.Float(True, 64)),
+        ("+", types.Float(True, None), types.Uint(False, 32), types.Float(False, None)),
         ("+", types.Angle(True, None), types.Angle(False, 8), types.Angle(False, None)),
         ("-", types.Uint(True, 4), types.Int(False, 3), types.Int(False, 4)),
         ("-", types.Uint(True, 4), types.Uint(False, None), types.Uint(False, None)),
+        ("-", types.Int(True, None), types.Float(True, 64), types.Float(True, 64)),
+        ("-", types.Float(True, None), types.Uint(False, 32), types.Float(False, None)),
         ("-", types.Float(True, 64), types.Float(True, 64), types.Float(True, 64)),
         ("-", types.Angle(True, 4), types.Angle(True, 8), types.Angle(True, 8)),
         ("/", types.Int(True, 5), types.Uint(True, None), types.Int(True, None)),
@@ -299,6 +303,8 @@ def test_unary_minus_rejects_bad_types():
         ("*", types.Float(True, 64), types.Int(False, None), types.Float(False, 64)),
         ("*", types.Angle(True, 8), types.Int(False, None), types.Angle(False, 8)),
         ("*", types.Float(False, 64), types.Float(True, None), types.Float(False, None)),
+        ("*", types.Int(True, None), types.Float(True, 64), types.Float(True, 64)),
+        ("*", types.Float(True, None), types.Uint(False, 32), types.Float(False, None)),
     ),
     ids=lambda x: x.pretty() if isinstance(x, types.Type) else x,
 )
@@ -320,7 +326,6 @@ def test_binary_operator(op, left_type, right_type, out_type):
 @pytest.mark.parametrize(
     ("op", "left_type", "right_type"),
     (
-        ("+", types.Int(True, 3), types.Float(True, 4)),
         ("+", types.Duration(True), types.Float(True, 64)),
         ("+", types.Int(True, 4), types.Angle(True, 4)),
         ("-", types.Angle(True, 4), types.Float(True, 64)),
