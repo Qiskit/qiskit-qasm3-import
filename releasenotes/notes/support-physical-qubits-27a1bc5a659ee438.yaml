@@ -1,0 +1,10 @@
+---
+features:
+  - |
+    Added the ability to handle references to physical qubits. A layout is
+    included in the output circuit that maps a quantum register to the
+    non-negative integers identifying the physical qubits in the order that they
+    are encountered in the OpenQASM 3 code.
+
+    Currently mixing references to physical qubits with declarations of virtual
+    qubits in an OpenQASM 3 program is not allowed and raises an error.

@@ -7,7 +7,7 @@ from .converter import ConvertVisitor
 def convert(node: openqasm3.ast.Program) -> QuantumCircuit:
     """Convert a parsed OpenQASM 3 program in AST form, into a Qiskit
     :class:`~qiskit.circuit.QuantumCircuit`."""
-    return ConvertVisitor().convert(node)
+    return ConvertVisitor().convert(node).circuit
 
 
 def parse(string: str, /) -> QuantumCircuit:

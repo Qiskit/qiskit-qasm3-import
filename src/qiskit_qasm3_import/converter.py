@@ -1,7 +1,5 @@
 __all__ = ["ConvertVisitor"]
 
-import itertools
-import math
 import re
 import string
 import sys
@@ -25,13 +23,17 @@ from qiskit.circuit import (
     Qubit,
 )
 from qiskit.circuit.parametertable import ParameterReferences
+from qiskit.transpiler import Layout
+from qiskit.transpiler.layout import TranspileLayout
 from qiskit.circuit.library import standard_gates as _std
 
 from . import types
 from .data import Scope, Symbol
 from .exceptions import ConversionError, raise_from_node
 from .expression import ValueResolver, resolve_condition
+from .state import State, SymbolTables, LocalScope, GateScope, is_physical
 
+_QASM2_IDENTIFIER = re.compile(r"[a-z]\w*", flags=re.ASCII)
 
 _STDGATES = {
     "p": (_std.PhaseGate, 1, 1),
@@ -72,71 +74,6 @@ _STDGATES = {
     "u3": (_std.U3Gate, 3, 1),
 }
 
-_BUILTINS = {
-    "U": Symbol(
-        "U",
-        _std.UGate,
-        types.Gate([types.Angle() for _ in [None] * 3], [types.Qubit()]),
-        Scope.BUILTIN,
-    ),
-    "pi": Symbol("pi", math.pi, types.Float(const=True), Scope.BUILTIN),
-    "π": Symbol("π", math.pi, types.Float(const=True), Scope.BUILTIN),
-    "tau": Symbol("tau", math.tau, types.Float(const=True), Scope.BUILTIN),
-    "τ": Symbol("τ", math.tau, types.Float(const=True), Scope.BUILTIN),
-    "euler": Symbol("euler", math.e, types.Float(const=True), Scope.BUILTIN),
-    "ℇ": Symbol("ℇ", math.e, types.Float(const=True), Scope.BUILTIN),
-}
-
-
-class State:
-    __slots__ = ("scope", "source", "circuit", "symbol_table", "_unique")
-
-    def __init__(self, scope: Scope, source: Optional[str] = None):
-        self.scope = scope
-        self.source = source
-        self.circuit = QuantumCircuit()
-        self.symbol_table = _BUILTINS.copy()
-        self._unique = (f"_{x}" for x in itertools.count())
-
-    def gate_scope(self):
-        """Get a new state for entry to a "gate" scope."""
-        # We use the entire source, because at the moment, that's what all the error messages
-        # expect; the nodes have references to the complete source in their spans.
-        out = State(Scope.GATE, self.source)
-        for name, item in self.symbol_table.items():
-            if (item.scope is Scope.BUILTIN) or (
-                item.scope is Scope.GLOBAL
-                and (
-                    isinstance(item.type, types.Gate)
-                    or isinstance(
-                        item.type, (types.Int, types.Uint, types.Float, types.Angle, types.Duration)
-                    )
-                    and item.type.const
-                )
-            ):
-                out.symbol_table[name] = item
-        return out
-
-    def local_scope(self):
-        """Get a new state on entry to a local block scope."""
-        # pylint: disable=protected-access
-        out = State.__new__(State)
-        out.scope = Scope.LOCAL
-        out.source = self.source
-        out.circuit = self.circuit  # No copy; we want to keep modifying this one.
-        out.symbol_table = self.symbol_table.copy()
-        out._unique = self._unique
-        return out
-
-    def unique_name(self, prefix=""):
-        """Get a name that is not defined in the current scope."""
-        while (name := f"{prefix}{next(self._unique)}") in self.symbol_table:
-            pass
-        return name
-
-
-_QASM2_IDENTIFIER = re.compile(r"[a-z]\w*", flags=re.ASCII)
-
 
 def _escape_qasm2(name: str) -> str:
     """Escape a `name` to produce a valid OpenQASM 2 identifier (ignoring things like reserved
@@ -151,22 +88,32 @@ def _escape_qasm2(name: str) -> str:
     return name
 
 
+# A hardware-qubit symbol has the form '$' followed by digits.
+# The digits are the identifier used by backends.
+def hardware_qubit_map(symbol_table: SymbolTables):
+    "Return a `dict` mapping `Qubit` instances to `int`s representing physical qubit identifiers."
+    return {sym.data: int(sym.name[1:]) for sym in symbol_table.globals() if is_physical(sym)}
+
+
 class GateBuilder:
     def __init__(
         self, name: str, definition: QuantumCircuit, order: Optional[Sequence[Parameter]] = None
     ):
-        self.name = name
-        self.definition = definition
-        self.order = tuple(self.definition.parameters) if order is None else tuple(order)
+        self._name = name
+        self._definition = definition
+        self._order = tuple(self._definition.parameters) if order is None else tuple(order)
 
     def __call__(self, *parameters):
-        if len(parameters) != len(self.order):
-            raise ConversionError("incorrect number of parameters in call")
-        out = Gate(self.name, self.definition.num_qubits, parameters)
+        if len(parameters) != len(self._order):
+            raise ConversionError(
+                "incorrect number of parameters in call. Expecting "
+                f" {len(self._order)}, got {len(parameters)}."
+            )
+        out = Gate(self._name, self._definition.num_qubits, parameters)
         if parameters:
-            out._definition = self.definition.assign_parameters(dict(zip(self.order, parameters)))
+            out._definition = self._definition.assign_parameters(dict(zip(self._order, parameters)))
         else:
-            out._definition = self.definition.copy()
+            out._definition = self._definition.copy()
         return out
 
 
@@ -186,10 +133,20 @@ class ConvertVisitor(QASMVisitor[State]):
     # pylint: disable=missing-function-docstring,no-self-use,unused-argument
 
     def convert(self, node: ast.Program, *, source: Optional[str] = None) -> QuantumCircuit:
-        """Convert a program node into a :class:`~qiskit.circuit.QuantumCircuit`.  If given,
-        `source` is a string containing the OpenQASM 3 source code that was parsed into `node`.
-        This is used to generated improved error messages."""
-        return self.visit(node, State(Scope.GLOBAL, source)).circuit
+        """Convert a program node into a :class:`~qiskit.circuit.QuantumCircuit`.
+
+        If given, `source` is a string containing the OpenQASM 3 source code that was parsed into
+        `node`.  This is used to generated improved error messages. A :class:`.State` containing
+        information about the conversion is returned. The :class:`~qiskit.circuit.QuantumCircuit` is
+        stored in property thereof named `circuit`.
+        """
+
+        state = self.visit(node, State(source))
+        hardware_qubits = hardware_qubit_map(state.symbol_table)
+        if len(hardware_qubits) > 0:
+            # pylint: disable=protected-access
+            state.circuit._layout = TranspileLayout(Layout(hardware_qubits), hardware_qubits)
+        return state
 
     def _raise_previously_defined(self, new: Symbol, old: Symbol, node: ast.QASMNode) -> NoReturn:
         message = f"'{new.name}' is already defined."
@@ -210,9 +167,9 @@ class ConvertVisitor(QASMVisitor[State]):
             raise_from_node(definer, "gates can only be declared globally")
         type = types.Gate(n_parameters, n_qubits)
         symbol = Symbol(name, definition, type, Scope.GLOBAL, definer)
-        if (previous := context.symbol_table.get(name)) is not None:
+        if (previous := context.symbol_table.get(name, definer)) is not None:
             self._raise_previously_defined(symbol, previous, definer)
-        context.symbol_table[name] = symbol
+        context.symbol_table.insert(symbol)
         return context
 
     def _apply_gate_modifier(
@@ -265,7 +222,7 @@ class ConvertVisitor(QASMVisitor[State]):
         context.circuit._parameter_table[parameter] = ParameterReferences(())
 
     def _resolve_generic(self, node: ast.Expression, context: State) -> Tuple[Any, types.Type]:
-        return ValueResolver(context.symbol_table).resolve(node)
+        return ValueResolver(context).resolve(node)
 
     def _resolve_constant_int(self, node: ast.Expression, context: State) -> int:
         value, type = self._resolve_generic(node, context)
@@ -305,19 +262,19 @@ class ConvertVisitor(QASMVisitor[State]):
         self, node: ast.Expression, context: State
     ) -> Union[Qubit, QuantumRegister, List[Qubit]]:
         value, type = self._resolve_generic(node, context)
-        if not isinstance(type, (types.Qubit, types.QubitArray)):
+        if not isinstance(type, (types.Qubit, types.HardwareQubit, types.QubitArray)):
             raise_from_node(node, "required a qubit or qubit register")
         return value
 
     def _resolve_condition(
         self, node: ast.Expression, context: State
     ) -> Union[Tuple[ClassicalRegister, int], Tuple[Clbit, bool]]:
-        lhs, rhs = resolve_condition(node, context.symbol_table)
+        lhs, rhs = resolve_condition(node, context)
         if not isinstance(lhs, (Clbit, ClassicalRegister)):
             name = context.unique_name()
             lhs = ClassicalRegister(name=_escape_qasm2(name), bits=lhs)
             context.circuit.add_register(lhs)
-            context.symbol_table[name] = Symbol(name, lhs, types.BitArray, Scope.NONE)
+            context.symbol_table.insert(Symbol(name, lhs, types.BitArray, Scope.NONE))
         return (lhs, rhs)
 
     # Everything below is the implementation of the visitor itself.  The general `visit` method is
@@ -339,6 +296,7 @@ class ConvertVisitor(QASMVisitor[State]):
         return context
 
     def visit_QubitDeclaration(self, node: ast.QubitDeclaration, context: State) -> State:
+        context.addressing_mode.set_virtual_mode(node)
         name = node.qubit.name
         if node.size is None:
             bit = Qubit()
@@ -349,23 +307,23 @@ class ConvertVisitor(QASMVisitor[State]):
             register = QuantumRegister(size, name=_escape_qasm2(name))
             context.circuit.add_register(register)
             symbol = Symbol(name, register, types.QubitArray(size), Scope.GLOBAL, node)
-        context.symbol_table[name] = symbol
+        context.symbol_table.insert(symbol)
         return context
 
     def visit_QuantumGateDefinition(self, node: ast.QuantumGateDefinition, context: State) -> State:
-        inner = context.gate_scope()
-        parameters = [Parameter(name.name) for name in node.arguments]
-        for parameter in parameters:
-            inner.symbol_table[parameter.name] = Symbol(
-                parameter.name, parameter, types.Angle(), Scope.GATE, node
-            )
-            self._add_circuit_parameter(parameter, inner)
-        bits = [Qubit() for _ in node.qubits]
-        inner.circuit.add_bits(bits)
-        for name, bit in zip(node.qubits, bits):
-            inner.symbol_table[name.name] = Symbol(name.name, bit, types.Qubit(), Scope.GATE, node)
-        for statement in node.body:
-            inner = self.visit(statement, inner)
+        with GateScope(context) as inner:
+            parameters = [Parameter(name.name) for name in node.arguments]
+            for parameter in parameters:
+                inner.symbol_table.insert(
+                    Symbol(parameter.name, parameter, types.Angle(), Scope.GATE, node)
+                )
+                self._add_circuit_parameter(parameter, inner)
+            bits = [Qubit() for _ in node.qubits]
+            inner.circuit.add_bits(bits)
+            for name, bit in zip(node.qubits, bits):
+                inner.symbol_table.insert(Symbol(name.name, bit, types.Qubit(), Scope.GATE, node))
+            for statement in node.body:
+                self.visit(statement, inner)
         return self._define_gate(
             node.name.name,
             GateBuilder(node.name.name, inner.circuit),
@@ -378,11 +336,11 @@ class ConvertVisitor(QASMVisitor[State]):
     def visit_QuantumGate(self, node: ast.QuantumGate, context: State) -> State:
         if node.duration is not None:
             raise_from_node(node, "gates with durations are not supported.")
-        if (gate_symbol := context.symbol_table.get(node.name.name)) is None:
+        if (gate_symbol := context.symbol_table.get(node.name.name, node)) is None:
             raise_from_node(node, f"gate '{node.name.name}' is not defined.")
         if not isinstance(gate_symbol.type, types.Gate):
             message = f"'{node.name.name}' is a '{gate_symbol.type.pretty()}', not a gate."
-            if (span := getattr(gate_symbol.definer, "span", None)) is not None:
+            if (span := gate_symbol.definer.span) is not None:
                 message += f" Definition on line {span.start_line}"
             raise_from_node(node, message)
         gate_builder = gate_symbol.data
@@ -447,7 +405,7 @@ class ConvertVisitor(QASMVisitor[State]):
             register = ClassicalRegister(size, name=_escape_qasm2(name))
             context.circuit.add_register(register)
             symbol = Symbol(name, register, types.BitArray(size), context.scope, node)
-        context.symbol_table[name] = symbol
+        context.symbol_table.insert(symbol)
         if node.init_expression is not None:
             if not isinstance(node.init_expression, ast.QuantumMeasurement):
                 raise_from_node(
@@ -480,7 +438,7 @@ class ConvertVisitor(QASMVisitor[State]):
         name = node.identifier.name
         parameter = Parameter(name)
         symbol = Symbol(name, parameter, type, Scope.GLOBAL, node)
-        context.symbol_table[name] = symbol
+        context.symbol_table.insert(symbol)
         self._add_circuit_parameter(parameter, context)
         return context
 
@@ -495,23 +453,23 @@ class ConvertVisitor(QASMVisitor[State]):
     def visit_BranchingStatement(self, node: ast.BranchingStatement, context: State) -> State:
         condition = self._resolve_condition(node.condition, context)
         with context.circuit.if_test(condition) as else_:
-            inner = context.local_scope()
-            for statement in node.if_block:
-                inner = self.visit(statement, inner)
+            with LocalScope(context) as inner:
+                for statement in node.if_block:
+                    self.visit(statement, inner)
         if not node.else_block:
             return context
         with else_:
-            inner = context.local_scope()
-            for statement in node.else_block:
-                inner = self.visit(statement, inner)
+            with LocalScope(context) as inner:
+                for statement in node.else_block:
+                    self.visit(statement, inner)
         return context
 
     def visit_WhileLoop(self, node: ast.WhileLoop, context: State) -> State:
         condition = self._resolve_condition(node.while_condition, context)
         with context.circuit.while_loop(condition):
-            inner = context.local_scope()
-            for statement in node.block:
-                inner = self.visit(statement, inner)
+            with LocalScope(context) as inner:
+                for statement in node.block:
+                    self.visit(statement, inner)
         return context
 
     def visit_ForInLoop(self, node: ast.ForInLoop, context: State) -> State:
@@ -533,13 +491,13 @@ class ConvertVisitor(QASMVisitor[State]):
             )
         var_type = types.Int() if isinstance(node.type, ast.IntType) else types.Uint()
         with context.circuit.for_loop(indexset) as parameter:
-            inner = context.local_scope()
-            name = node.identifier.name
-            symbol = Symbol(name, parameter, var_type, Scope.LOCAL, node)
-            inner.symbol_table[name] = symbol
-            self._add_circuit_parameter(parameter, inner)
-            for statement in node.block:
-                inner = self.visit(statement, inner)
+            with LocalScope(context) as inner:
+                name = node.identifier.name
+                symbol = Symbol(name, parameter, var_type, Scope.LOCAL, node)
+                inner.symbol_table.insert(symbol)
+                self._add_circuit_parameter(parameter, inner)
+                for statement in node.block:
+                    self.visit(statement, inner)
         return context
 
     def visit_DelayInstruction(self, node: ast.DelayInstruction, context: State) -> State:
@@ -567,5 +525,5 @@ class ConvertVisitor(QASMVisitor[State]):
                 f"aliases must be of registers of either clbits or qubits, not '{type.pretty()}'",
             )
         context.circuit.add_register(register)
-        context.symbol_table[name] = Symbol(name, register, type, context.scope, node)
+        context.symbol_table.insert(Symbol(name, register, type, context.scope, node))
         return context

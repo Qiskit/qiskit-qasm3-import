@@ -50,6 +50,7 @@ disable = [
     "too-many-public-methods",
     "too-many-arguments",
     "too-many-instance-attributes",
+    "too-many-lines",
     "too-many-locals",
     "trailing-whitespace",
     "ungrouped-imports",

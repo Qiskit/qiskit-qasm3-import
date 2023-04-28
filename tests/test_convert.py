@@ -76,6 +76,46 @@ out = measure q;
     parse(source)
 
 
+def test_readme_circuit_physical_qubits():
+    source = """
+OPENQASM 3.0;
+include "stdgates.inc";
+
+input float[64] a;
+
+bit[2] mid;
+bit[3] out;
+
+gate my_gate(a) c, t {
+  gphase(a / 2);
+  ry(a) c;
+  cx c, t;
+}
+
+gate my_phase(a) c {
+  ctrl @ inv @ gphase(a) c;
+}
+
+my_gate(a * 2) $0, $1;
+measure $0 -> mid[0];
+measure $1 -> mid[1];
+
+while (mid == "00") {
+  reset $0;
+  reset $1;
+  my_gate(a) $0, $1;
+  my_phase(a - pi/2) $1;
+  mid[0] = measure $0;
+  mid[1] = measure $1;
+}
+
+out[0] = measure $0;
+out[1] = measure $1;
+out[2] = measure $2;
+    """
+    parse(source)
+
+
 def test_include_rejects_non_stdgates():
     source = "include 'unknown.qasm';"
     with pytest.raises(ConversionError, match="non-stdgates imports not currently supported"):
@@ -103,6 +143,16 @@ def test_stdgates_not_implicitly_included():
         parse(source)
 
 
+def test_undefined_symbol():
+    source = """
+       gate my_gate q {
+          U(0, new_symbol, 0) q;
+       }
+    """
+    with pytest.raises(ConversionError, match="Undefined symbol 'new_symbol'"):
+        parse(source)
+
+
 def test_qubit_declarations():
     source = """
         qubit q;
@@ -115,6 +165,29 @@ def test_qubit_declarations():
     assert qc.qregs == expected.qregs
     for left, right in zip(qc.qubits, expected.qubits):
         assert qc.find_bit(left) == expected.find_bit(right)
+
+
+def test_undeclared_physical_qubit():
+    source = """
+        reset $1;
+    """
+    qc = parse(source)
+    expected = QuantumCircuit([Qubit()])
+    expected.reset(0)
+    assert len(qc.qubits) == len(expected.qubits)
+    assert qc.qregs == expected.qregs
+    assert qc == expected
+
+
+def test_physical_qubit_stdgates():
+    source = """
+        include 'stdgates.inc';
+        h $0;
+    """
+    qc = parse(source)
+    expected = QuantumCircuit([Qubit()])
+    expected.h(0)
+    assert qc == expected
 
 
 def test_clbit_declarations():
@@ -235,6 +308,15 @@ def test_only_global_declarations():
         parse(source)
 
 
+def test_no_rebinding_in_global_scope():
+    source = """
+        include 'stdgates.inc';
+        qubit p;
+    """
+    with pytest.raises(ConversionError, match="already inserted in symbol table"):
+        parse(source)
+
+
 def test_basic_gate_definition():
     source = """
         include 'stdgates.inc';
@@ -257,6 +339,78 @@ def test_basic_gate_definition():
     expected.h(0)
     expected.cx(0, 1)
     assert qc.data[0].operation.definition == expected
+
+
+def test_parameter_shadows_global_1():
+    source = """
+        include 'stdgates.inc';
+
+        qubit q;
+
+        gate my_gate(p) q0 {
+            U(0, p, 0) q0;
+        }
+
+        my_gate(4.5) q;
+    """
+    qc = parse(source)
+
+    expected = QuantumCircuit([Qubit()])
+    expected.u(0, 4.5, 0, 0)
+    assert qc.data[0].operation.definition == expected
+
+
+def test_parameter_shadows_global_2():
+    source = """
+        include 'stdgates.inc';
+
+        qubit q;
+
+        gate my_gate(p) q0 {
+            U(0, p, 0) q0;
+            p q0;
+        }
+    """
+    with pytest.raises(ConversionError, match="not a gate"):
+        parse(source)
+
+
+def test_parameter_shadows_builtin():
+    source = """
+        include 'stdgates.inc';
+
+        qubit q;
+
+        gate my_gate(pi) q0 {
+            U(0, pi, 0) q0;
+        }
+
+        my_gate(4.5) q;
+    """
+    qc = parse(source)
+
+    expected = QuantumCircuit([Qubit()])
+    expected.u(0, 4.5, 0, 0)
+    assert qc.data[0].operation.definition == expected
+
+
+def test_input_shadows_builtin():
+    source = """
+        input float euler;
+        qubit q;
+        U(euler, euler, euler) q;
+    """
+    with pytest.raises(
+        ConversionError, match="Symbol 'euler' already inserted in symbol table in this scope"
+    ):
+        parse(source)
+    # qc = parse(source)
+    # assert len(qc.parameters) == 1
+    # assert qc.parameters[0].name == "euler"
+    # p = qc.parameters[0]
+    # expected = QuantumCircuit([Qubit()])
+    # expected.u(p, p, p, 0)
+    # assert qc == expected
 
 
 def test_parametrised_gate_definition():
@@ -334,7 +488,7 @@ def test_gate_definition_scope_limited():
             U(x, 0, 0) q;
         }
     """
-    with pytest.raises(ConversionError, match="name 'x' is not defined"):
+    with pytest.raises(ConversionError, match="not visible in the scope of a"):
         parse(source)
 
 
@@ -392,13 +546,13 @@ def test_gate_broadcast():
     source = """
         include "stdgates.inc";
         qubit[2] q;
-        qubit[2] p;
-        cx q[0], p;
-        cx q, p;
-        cx q, p[0];
+        qubit[2] p0;
+        cx q[0], p0;
+        cx q, p0;
+        cx q, p0[0];
     """
     qc = parse(source)
-    q, p = QuantumRegister(2, "q"), QuantumRegister(2, "p")
+    q, p = QuantumRegister(2, "q"), QuantumRegister(2, "p0")
     expected = QuantumCircuit(q, p)
     expected.cx(q[0], p)
     expected.cx(q, p)
@@ -412,8 +566,8 @@ def test_gate_broadcast_rejects_bad_lengths():
     source = """
         include "stdgates.inc";
         qubit[2] q;
-        qubit[3] p;
-        cx q, p;
+        qubit[3] p0;
+        cx q, p0;
     """
     with pytest.raises(ConversionError, match="mismatched lengths in gate broadcast"):
         parse(source)
@@ -695,7 +849,7 @@ def test_if_else_does_not_share_scope():
             x q1;
         }
     """
-    with pytest.raises(ConversionError, match="name 'q1' is not defined"):
+    with pytest.raises(ConversionError, match="Undefined symbol 'q1'"):
         parse(source)
 
 
@@ -710,7 +864,7 @@ def test_if_does_not_leak_scope():
         }
         x q1;
     """
-    with pytest.raises(ConversionError, match="name 'q1' is not defined"):
+    with pytest.raises(ConversionError, match="Undefined symbol 'q1'"):
         parse(source)
 
 
@@ -840,3 +994,180 @@ def test_alias_rejects_bad_types():
     """
     with pytest.raises(ConversionError, match="aliases must be of registers"):
         parse(source)
+
+
+def test_reject_mixed_addressing_mode_virtual_first():
+    source = """
+    qubit q1;
+    reset $0;
+    """
+    with pytest.raises(
+        ConversionError, match="Physical qubit referenced in virtual addressing mode"
+    ):
+        parse(source)
+
+
+def test_reject_mixed_addressing_mode_hardware_first():
+    source = """
+    reset $0;
+    qubit q1;
+    """
+    with pytest.raises(ConversionError, match="Virtual qubit declared in physical addressing mode"):
+        parse(source)
+
+
+def test_reject_mixed_addressing_mode_virtual_register():
+    source = """
+    reset $0;
+    qubit[3] q;
+    """
+    with pytest.raises(ConversionError, match="Virtual qubit declared in physical addressing mode"):
+        parse(source)
+
+
+def test_reject_mixed_addressing_mode_local_scope():
+    source = """
+    include "stdgates.inc";
+
+    bit[1] mid;
+
+    while(mid == "0") {
+      h $0;
+      mid[0] = measure $0;
+    }
+
+    qubit q;
+    """
+    with pytest.raises(ConversionError, match="Virtual qubit declared in physical addressing mode"):
+        parse(source)
+
+
+def test_reject_hardware_qubit_in_gate_body_1():
+    source = """
+        include 'stdgates.inc';
+
+        gate my_gate q {
+           h $0;
+        }
+    """
+    with pytest.raises(ConversionError, match="hardware qubits not allowed in gate definitions."):
+        parse(source)
+
+
+def test_reject_hardware_qubit_in_gate_body_2():
+    source = """
+        include 'stdgates.inc';
+
+        h $0;
+        gate my_gate q {
+           h $0;
+        }
+    """
+    with pytest.raises(ConversionError, match="hardware qubits not allowed in gate definitions."):
+        parse(source)
+
+
+def test_hardware_mode_and_user_gates():
+    source = """
+        include 'stdgates.inc';
+
+        reset $0;
+
+        gate my_gate(pi) q0 {
+            U(0, pi, 0) q0;
+        }
+
+        my_gate(4.5) $0;
+    """
+    qc = parse(source)
+    expected = QuantumCircuit([Qubit()])
+    expected.u(0, 4.5, 0, 0)
+    assert qc.data[1].operation.definition == expected
+
+
+# pylint: disable=protected-access
+def test_layout_for_hardware_qubits():
+    source = """
+        reset $99;
+    """
+    qc = parse(source)
+    expected = QuantumCircuit([Qubit()])
+    expected.reset(0)
+    assert qc == expected
+    assert qc._layout.input_qubit_mapping == {qc.qubits[0]: 99}
+
+
+def test_hardware_qubit_local_scope():
+    source = """
+    include "stdgates.inc";
+
+    bit[2] mid;
+
+    reset $101;
+    reset $100;
+    while (mid == "00") {
+        h $100;
+        h $101;
+        mid[0] = measure $100;
+        mid[1] = measure $101;
+     }
+    """
+    qc = parse(source)
+    assert qc._layout.input_qubit_mapping == dict(zip(qc.qubits, [101, 100]))
+
+
+def test_hardware_qubit_nested_scope():
+    source = """
+    include "stdgates.inc";
+
+    bit[2] mid;
+
+    reset $100;
+    reset $101;
+
+    if (mid[0]) {
+        while (mid == "00") {
+            h $100;
+            h $101;
+            mid[0] = measure $100;
+            mid[1] = measure $101;
+         }
+    }
+    """
+    qc = parse(source)
+    assert qc._layout.input_qubit_mapping == dict(zip(qc.qubits, [100, 101]))
+
+
+def test_hardware_qubit_first_seen_in_local_scope():
+    source = """
+    include "stdgates.inc";
+
+    bit[2] mid;
+
+    h $102;
+
+    while (mid == "00") {
+        h $0;
+        h $101;
+        mid[0] = measure $101;
+        mid[1] = measure $0;
+     }
+    """
+    qc = parse(source)
+    assert qc._layout.input_qubit_mapping == dict(zip(qc.qubits, [102, 0, 101]))
+
+
+def test_use_hardware_qubit_first_seen_in_local_scope():
+    source = """
+    include "stdgates.inc";
+
+    bit[1] mid;
+
+    while (mid == "0") {
+        h $100;
+        mid[0] = measure $100;
+     }
+    x $100;
+    """
+    qc = parse(source)
+    assert qc._layout.input_qubit_mapping == dict(zip(qc.qubits, [100]))
