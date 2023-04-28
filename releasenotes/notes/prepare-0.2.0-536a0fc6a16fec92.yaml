@@ -1,0 +1,6 @@
+---
+prelude: >
+    `qiskit-qasm3-import` version 0.2.0 contains some new support
+    for working with physical qubits.  You most likely want to access
+    these features using :func:`qiskit.qasm3.load` and :func:`~qiskit.qasm3.loads`,
+    after updating this package.

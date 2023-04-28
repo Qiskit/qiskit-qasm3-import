@@ -1,0 +1,6 @@
+---
+fixes:
+  - |
+    Fixed binary operations between integer types and floating-point values.
+    These were previously forbidden, but should have caused implicit promotion
+    of the integer values to floats.
