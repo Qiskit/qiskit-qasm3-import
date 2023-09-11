@@ -326,7 +326,7 @@ def resolve_condition(
             raise_from_node(node, "only '==' is supported in register comparisons")
         return (bit_value, cmp_value)
     if isinstance(node, ast.UnaryExpression):
-        if node.op is not ast.UnaryOperator["~"]:
+        if node.op not in (ast.UnaryOperator["~"], ast.UnaryOperator["!"]):
             raise_from_node(node, f"unhandled unary operator '{node.op.name}'")
         value, type = value_resolver.visit(node.expression)
         if isinstance(type, types.Bit):

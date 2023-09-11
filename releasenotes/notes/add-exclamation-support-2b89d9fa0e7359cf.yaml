@@ -1,0 +1,4 @@
+---
+features:
+  - |
+    Boolean negation using the ``!`` operator on scalar ``bit`` types is now supported.
