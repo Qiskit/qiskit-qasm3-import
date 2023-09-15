@@ -65,13 +65,14 @@ def test_implicit_bit():
     assert resolve_condition(node, context) == (bit, True)
 
 
-def test_implicit_negated_bit():
+@pytest.mark.parametrize("op", ("~", "!"))
+def test_implicit_negated_bit(op):
     bit = Clbit()
     symbols = [
         Symbol("a", bit, types.Bit(), Scope.GLOBAL),
     ]
     context = _make_context(symbols)
-    node = ast.UnaryExpression(ast.UnaryOperator["~"], ast.Identifier("a"))
+    node = ast.UnaryExpression(ast.UnaryOperator[op], ast.Identifier("a"))
     assert resolve_condition(node, context) == (bit, False)
 
 
