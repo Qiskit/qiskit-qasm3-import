@@ -17,9 +17,6 @@ while various technical details are decided on the Qiskit side, as switching
 parsing frameworks and so on is far more complex for code brought into Qiskit,
 as the stability guarantees are much stronger.
 
-.. contents::
-   :class: this-will-duplicate-information-and-it-is-still-useful-here
-
 
 API
 ---
