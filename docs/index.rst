@@ -1,6 +1,11 @@
 OpenQASM 3 Importer for Qiskit
 ==============================
 
+.. toctree:: 
+    :hidden: 
+ 
+    Home <self>
+
 .. module:: qiskit_qasm3_import
 
 This project is a temporary importer for parsing simple OpenQASM 3 programmes
@@ -11,8 +16,6 @@ importer to be merged into mainline Qiskit.  This project is a stop-gap measure,
 while various technical details are decided on the Qiskit side, as switching
 parsing frameworks and so on is far more complex for code brought into Qiskit,
 as the stability guarantees are much stronger.
-
-.. contents::
 
 
 API
