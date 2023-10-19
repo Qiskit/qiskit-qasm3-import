@@ -1,0 +1,5 @@
+---
+prelude: >
+    This is a small release that primarily updates the dependency on the external
+    OpenQASM 3 parser used, including a couple of bugfixes and expanding the range
+    of ANTLR versions supported.
