@@ -558,8 +558,23 @@ def test_gate_broadcast():
     expected.cx(q, p)
     expected.cx(q, p[0])
     assert qc == expected
-    # We need to be safe in the event of mutation.
-    assert len({id(x.operation) for x in qc.data}) == len(qc.data)
+    # We need to be safe in the event of mutation.  We can be safe either if the object is
+    # immutable, or if it's mutable but only present once in the circuit.
+    num_safe_mutate = 0
+    unsafe_mutate_indices = []
+    refs = set()
+    for i, instruction in enumerate(qc.data):
+        # Be careful: the `mutable` attribute is only Qiskit 0.45+.
+        if getattr(instruction.operation, "mutable", True):
+            if id(instruction.operation) in refs:
+                unsafe_mutate_indices.append(i)
+            else:
+                num_safe_mutate += 1
+                refs.add(id(instruction.operation))
+        else:
+            num_safe_mutate += 1
+    assert not unsafe_mutate_indices
+    assert num_safe_mutate == len(qc.data)
 
 
 def test_gate_broadcast_rejects_bad_lengths():
