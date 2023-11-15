@@ -1,0 +1,8 @@
+---
+upgrade:
+  - |
+    This package now depends on `qiskit>=0.37,<1.0` instead of `qiskit-terra>=0.21`.  This reflects
+    how the Qiskit package is now structured, with the lower bound referring to the same version of
+    Terra.  This package is due to cease being the preferred OpenQASM 3 importer for Qiskit around
+    the 1.0, but the upper bound is more specifically because the package is not yet guaranteeing
+    that it will support all the changes.
