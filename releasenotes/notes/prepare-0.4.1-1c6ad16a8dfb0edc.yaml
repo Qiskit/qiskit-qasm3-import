@@ -1,0 +1,6 @@
+---
+prelude: >
+    The 0.4.1 release relaxes the upper bound on the Qiskit dependency, since this package is
+    developed in conjunction with Qiskit itself and is tested in its CI, while Qiskit continues to
+    use this.  There are no expected changes in Qiskit 1.0 that will stop this package working,
+    though Qiskit is expected to change its default supplier of OpenQASM 3 parsing.
