@@ -1,0 +1,5 @@
+---
+prelude: >
+  This is a small release that updates the core dependency to ``qiskit`` from ``qiskit-terra``.
+  This is the now-preferred way to depend on Qiskit, and for installations updated in the last
+  four months, will have no meaningful effect on the actual packaging.
