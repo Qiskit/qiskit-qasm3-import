@@ -1,0 +1,12 @@
+---
+fixes:
+  - |
+    Importing a circuit with physical qubits (for example ``$4``) will now create a
+    :class:`~qiskit.circuit.QuantumCircuit` that has as many qubits as implied by the maximum
+    physical-qubit index encountered.  For example, if the largest physical qubit encountered is
+    ``$4``, the output circuit will have five qubits.
+
+    Previously, the circuit would only have as many qubit objects as were explicitly used and the
+    :class:`~qiskit.transpiler.TranspileLayout` of the circuit would attempt to indicate the mapping,
+    but this was at odds with how Qiskit typically represents physical circuits, and the returned
+    layout was in a non-standard form.

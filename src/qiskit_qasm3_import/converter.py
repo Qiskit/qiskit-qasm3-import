@@ -31,7 +31,7 @@ from . import types
 from .data import Scope, Symbol
 from .exceptions import ConversionError, raise_from_node
 from .expression import ValueResolver, resolve_condition
-from .state import State, SymbolTables, LocalScope, GateScope, is_physical
+from .state import State, LocalScope, GateScope
 
 _QASM2_IDENTIFIER = re.compile(r"[a-z]\w*", flags=re.ASCII)
 
@@ -88,13 +88,6 @@ def _escape_qasm2(name: str) -> str:
     return name
 
 
-# A hardware-qubit symbol has the form '$' followed by digits.
-# The digits are the identifier used by backends.
-def hardware_qubit_map(symbol_table: SymbolTables):
-    "Return a `dict` mapping `Qubit` instances to `int`s representing physical qubit identifiers."
-    return {sym.data: int(sym.name[1:]) for sym in symbol_table.globals() if is_physical(sym)}
-
-
 class GateBuilder:
     def __init__(
         self, name: str, definition: QuantumCircuit, order: Optional[Sequence[Parameter]] = None
@@ -141,11 +134,14 @@ class ConvertVisitor(QASMVisitor[State]):
         stored in property thereof named `circuit`.
         """
 
-        state = self.visit(node, State(source))
-        hardware_qubits = hardware_qubit_map(state.symbol_table)
-        if len(hardware_qubits) > 0:
+        state: State = self.visit(node, State(source))
+        if state.addressing_mode.is_physical():
             # pylint: disable=protected-access
-            state.circuit._layout = TranspileLayout(Layout(hardware_qubits), hardware_qubits)
+            state.circuit._layout = TranspileLayout(
+                initial_layout=Layout.from_qubit_list(state.circuit.qubits),
+                input_qubit_mapping={bit: i for i, bit in enumerate(state.circuit.qubits)},
+                final_layout=None,
+            )
         return state
 
     def _raise_previously_defined(self, new: Symbol, old: Symbol, node: ast.QASMNode) -> NoReturn:

@@ -11,6 +11,7 @@ from qiskit.circuit import (
     Qubit,
 )
 from qiskit.quantum_info import Operator
+from qiskit.transpiler import TranspileLayout, Layout
 
 from qiskit_qasm3_import import parse, ConversionError
 
@@ -172,11 +173,77 @@ def test_undeclared_physical_qubit():
         reset $1;
     """
     qc = parse(source)
-    expected = QuantumCircuit([Qubit()])
-    expected.reset(0)
+    expected = QuantumCircuit([Qubit(), Qubit()])
+    expected.reset(1)
     assert len(qc.qubits) == len(expected.qubits)
     assert qc.qregs == expected.qregs
     assert qc == expected
+
+
+def test_undeclared_physical_qubits_with_gaps():
+    """We should output a circuit that has as many qubits as the highest physical qubit used, since
+    Qiskit only represents physical qubits by integer indices."""
+    source = """
+        include "stdgates.inc";
+        bit[2] c;
+        h $3;
+        cx $5, $3;
+        c[0] = measure $3;
+        c[1] = measure $5;
+    """
+    qc = parse(source)
+    expected = QuantumCircuit([Qubit() for _ in range(6)], ClassicalRegister(2, "c"))
+    expected.h(3)
+    expected.cx(5, 3)
+    expected.measure([3, 5], [0, 1])
+    assert qc == expected
+
+    # Note we have to use the 'Qubit' instances of the parsed circuit when comparing layouts, since
+    # that's outside the context of the full comparison.
+    expected_layout = TranspileLayout(
+        initial_layout=Layout.from_qubit_list(qc.qubits),
+        input_qubit_mapping={bit: i for i, bit in enumerate(qc.qubits)},
+        final_layout=None,
+    )
+    assert qc.layout == expected_layout
+
+
+def test_undeclared_physical_qubits_in_control_flow():
+    source = """
+        include "stdgates.inc";
+        bit[2] c;
+        if (c[0]) {
+            h $7;
+        }
+        while (c == 0) {
+            while (!c[0]) {
+                h $3;
+                cx $3, $9;
+                c[0] = measure $3;
+                c[1] = measure $9;
+            }
+        }
+        h $9;
+    """
+    qc = parse(source)
+    cr = ClassicalRegister(2, "c")
+    expected = QuantumCircuit([Qubit() for _ in range(10)], cr)
+    with expected.if_test((cr[0], True)):
+        expected.h(7)
+    with expected.while_loop((cr, 0)):
+        with expected.while_loop((cr[0], False)):
+            expected.h(3)
+            expected.cx(3, 9)
+            expected.measure([3, 9], [0, 1])
+    expected.h(9)
+    assert qc == expected
+
+    expected_layout = TranspileLayout(
+        initial_layout=Layout.from_qubit_list(qc.qubits),
+        input_qubit_mapping={bit: i for i, bit in enumerate(qc.qubits)},
+        final_layout=None,
+    )
+    assert qc.layout == expected_layout
 
 
 def test_physical_qubit_stdgates():
@@ -1098,91 +1165,3 @@ def test_hardware_mode_and_user_gates():
     expected = QuantumCircuit([Qubit()])
     expected.u(0, 4.5, 0, 0)
     assert qc.data[1].operation.definition == expected
-
-
-# pylint: disable=protected-access
-def test_layout_for_hardware_qubits():
-    source = """
-        reset $99;
-    """
-    qc = parse(source)
-    expected = QuantumCircuit([Qubit()])
-    expected.reset(0)
-    assert qc == expected
-    assert qc._layout.input_qubit_mapping == {qc.qubits[0]: 99}
-
-
-def test_hardware_qubit_local_scope():
-    source = """
-    include "stdgates.inc";
-
-    bit[2] mid;
-
-    reset $101;
-    reset $100;
-    while (mid == "00") {
-        h $100;
-        h $101;
-        mid[0] = measure $100;
-        mid[1] = measure $101;
-     }
-    """
-    qc = parse(source)
-    assert qc._layout.input_qubit_mapping == dict(zip(qc.qubits, [101, 100]))
-
-
-def test_hardware_qubit_nested_scope():
-    source = """
-    include "stdgates.inc";
-
-    bit[2] mid;
-
-    reset $100;
-    reset $101;
-
-    if (mid[0]) {
-        while (mid == "00") {
-            h $100;
-            h $101;
-            mid[0] = measure $100;
-            mid[1] = measure $101;
-         }
-    }
-    """
-    qc = parse(source)
-    assert qc._layout.input_qubit_mapping == dict(zip(qc.qubits, [100, 101]))
-
-
-def test_hardware_qubit_first_seen_in_local_scope():
-    source = """
-    include "stdgates.inc";
-
-    bit[2] mid;
-
-    h $102;
-
-    while (mid == "00") {
-        h $0;
-        h $101;
-        mid[0] = measure $101;
-        mid[1] = measure $0;
-     }
-    """
-    qc = parse(source)
-    assert qc._layout.input_qubit_mapping == dict(zip(qc.qubits, [102, 0, 101]))
-
-
-def test_use_hardware_qubit_first_seen_in_local_scope():
-    source = """
-    include "stdgates.inc";
-
-    bit[1] mid;
-
-    while (mid == "0") {
-        h $100;
-        mid[0] = measure $100;
-     }
-    x $100;
-    """
-    qc = parse(source)
-    assert qc._layout.input_qubit_mapping == dict(zip(qc.qubits, [100]))
