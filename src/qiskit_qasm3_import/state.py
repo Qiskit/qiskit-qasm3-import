@@ -29,14 +29,16 @@ _BUILTINS = {
 }
 
 
-_PHYSICAL_QUBIT_RE = re.compile(r"\$\d+")
+_PHYSICAL_QUBIT_RE = re.compile(r"\$(?P<index>\d+)")
 
 
-def is_physical(name: Union[str, Symbol]):
-    "Return true if name is a valid identifier for a physical qubit."
+def physical_qubit_index(name: Union[str, Symbol]) -> Optional[int]:
+    """If this name is a physical qubit, return its integer index.  If not, return ``None``."""
     if isinstance(name, Symbol):
         name = name.name
-    return re.match(_PHYSICAL_QUBIT_RE, name) is not None
+    if match := _PHYSICAL_QUBIT_RE.fullmatch(name):
+        return int(match["index"])
+    return None
 
 
 class AddressingMode:
@@ -132,7 +134,7 @@ class SymbolTables:
 
     def get(self, name: str, node=None):
         top_scope = self[len(self) - 1].scope
-        if top_scope is Scope.GATE and is_physical(name):
+        if top_scope is Scope.GATE and physical_qubit_index(name) is not None:
             raise_from_node(
                 node,
                 f"Illegal qubit reference '{name}'. References to hardware "

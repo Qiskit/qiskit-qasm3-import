@@ -97,15 +97,18 @@ class ValueResolver(QASMVisitor):
         cxt = self._context
         if (symbol := cxt.symbol_table.get(node.name, node)) is not None:
             return symbol.data, symbol.type
-        if not state.is_physical(node.name):
+        if (index := state.physical_qubit_index(node.name)) is None:
             raise_from_node(node, f"Undefined symbol '{node.name}'.")
 
         cxt.addressing_mode.set_physical_mode(node)
-        bit = Qubit()
-        cxt.circuit.add_bits([bit])
-        symbol = Symbol(node.name, bit, types.HardwareQubit(), Scope.GLOBAL, node)
-        cxt.symbol_table.insert(symbol)
-        return symbol.data, symbol.type
+        num_qubits = cxt.circuit.num_qubits
+        new_identifiers = [ast.Identifier(name=f"${i}") for i in range(num_qubits, index + 1)]
+        new_bits = [Qubit() for _ in new_identifiers]
+        hardware_qubit = types.HardwareQubit()
+        for name, bit in zip(new_identifiers, new_bits):
+            cxt.symbol_table.insert(Symbol(name.name, bit, hardware_qubit, Scope.GLOBAL, None))
+        cxt.circuit.add_bits(new_bits)
+        return new_bits[-1], hardware_qubit
 
     def visit_IntegerLiteral(self, node: ast.IntegerLiteral):
         return node.value, types.Int(const=True)
