@@ -1,0 +1,6 @@
+---
+prelude: >
+    The 0.4.2 release fixes a bug in handling circuits defined on hardware qubits.  This release
+    also adds an Apache-2.0 licence header to the source files in the distribution; the project has
+    always been Apache-2.0 licensed, and the full licence file has always been distributed with it,
+    but the additional standard Qiskit per-file notice was accidentally absent.
