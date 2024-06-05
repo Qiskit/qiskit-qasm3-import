@@ -218,6 +218,13 @@ class ValueResolver(QASMVisitor):
                     else max((lhs_type.size, rhs_type.size))
                 )
                 out_type = types.Angle(const, size)
+            elif not self._strict and (
+                (isinstance(lhs_type, types.Angle) and isinstance(rhs_type, types.Float))
+                or (isinstance(rhs_type, types.Angle) and isinstance(lhs_type, types.Float))
+            ):
+                const = lhs_type.const and rhs_type.const
+                size = lhs_type.size if isinstance(lhs_type, types.Angle) else rhs_type.size
+                out_type = types.Angle(const, size)
             if out_type is not None:
                 out_value = (
                     lhs_value + rhs_value

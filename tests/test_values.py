@@ -339,7 +339,8 @@ def test_binary_operator(op, left_type, right_type, out_type):
     (
         ("+", types.Duration(True), types.Float(True, 64), None),
         ("+", types.Int(True, 4), types.Angle(True, 4), None),
-        ("-", types.Angle(True, 4), types.Float(True, 64), None),
+        ("-", types.Float(True, None), types.Angle(False, None), types.Angle(False, None)),
+        ("-", types.Angle(True, 4), types.Float(True, 64), types.Angle(True, 4)),
         ("-", types.Uint(True, 4), types.Angle(False, 3), None),
         ("*", types.Angle(True, 4), types.Angle(True, 4), None),
         ("*", types.Angle(True, 4), types.Float(True, None), types.Angle(True, 4)),
