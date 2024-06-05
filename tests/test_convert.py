@@ -340,6 +340,15 @@ def test_input_defines_parameter():
     assert qc == expected
 
 
+def test_unused_input_defines_parameter():
+    source = """
+        input float a;
+    """
+    qc = parse(source)
+    assert len(qc.parameters) == 1
+    assert qc.parameters[0].name == "a"
+
+
 def test_invalid_register_names_are_escaped():
     """Terra as of 0.22 only allows registers with valid OQ2 identifiers as names.  This restriction
     may be relaxed following Qiskit/qiskit-terra#9100."""
@@ -513,6 +522,22 @@ def test_parametrised_gate_definition():
     expected.u(0, 4.5, 0, 0)
     expected.cx(0, 1)
     assert qc.data[0].operation.definition == expected
+
+
+def test_parametrised_gate_without_use():
+    # Test that a gate parametrised on an angle that's not actually used in the gate body works.
+    source = """
+        include 'stdgates.inc';
+        qubit q;
+        gate my_gate(p) a {
+            x a;
+        }
+        my_gate(0.5) q;
+    """
+    qc = parse(source)
+    assert len(qc.data) == 1
+    assert qc.data[0].operation.name == "my_gate"
+    assert qc.data[0].qubits == tuple(qc.qubits)
 
 
 def test_gate_cannot_redefine():

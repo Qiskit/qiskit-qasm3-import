@@ -15,7 +15,7 @@ from typing import Optional, Union
 import itertools
 import math
 
-from qiskit.circuit import QuantumCircuit
+from qiskit.circuit import QuantumCircuit, Parameter
 
 from qiskit.circuit.library import standard_gates as _std
 
@@ -50,6 +50,16 @@ def physical_qubit_index(name: Union[str, Symbol]) -> Optional[int]:
     if match := _PHYSICAL_QUBIT_RE.fullmatch(name):
         return int(match["index"])
     return None
+
+
+def add_dummy_parameter_reference(circuit: QuantumCircuit, parameter: Parameter):
+    """Ensure that a circuit contains at least one reference to a given parameter."""
+    # TODO: this is a hack because Terra doesn't have any public way to add a parameter with
+    # no uses to a circuit, but we need to ensure that things work in later bindings if
+    # they're not all there.  This uses the fact that `parameter - parameter` is a
+    # `ParameterExpression` representation of zero that still tracks that it was once
+    # parametric over `parameter`.
+    circuit.global_phase += parameter - parameter
 
 
 class AddressingMode:
@@ -213,7 +223,15 @@ class State:
                   virtual, or hardware.
     """
 
-    __slots__ = ("scope", "_source", "circuit", "symbol_table", "_unique", "addressing_mode")
+    __slots__ = (
+        "scope",
+        "_source",
+        "circuit",
+        "symbol_table",
+        "_unique",
+        "addressing_mode",
+        "all_parameters",
+    )
 
     def __init__(self, source: Optional[str] = None):
         # We use the entire source, because at the moment, that's what all the error messages
@@ -222,6 +240,7 @@ class State:
         self.scope = Scope.GLOBAL
         self.symbol_table = SymbolTables()
         self.addressing_mode = AddressingMode()
+        self.all_parameters = set()
         self.circuit = QuantumCircuit()
         self._unique = (f"_{x}" for x in itertools.count())
         self._finish_init()
@@ -237,6 +256,7 @@ class State:
         new_context.symbol_table = context.symbol_table
         new_context.symbol_table.push(SymbolTable(scope))
         new_context.addressing_mode = context.addressing_mode
+        new_context.all_parameters = set()
         new_context._source = context._source
         return new_context
 
@@ -270,6 +290,10 @@ class LocalScope:
         return self._local_scope
 
     def __exit__(self, _exc_type, _exc_value, _traceback):
+        for parameter in self._local_scope.all_parameters - set(
+            self._local_scope.circuit.parameters
+        ):
+            add_dummy_parameter_reference(self._local_scope.circuit, parameter)
         self._local_scope.symbol_table.pop()
 
 
@@ -281,4 +305,6 @@ class GateScope:
         return self._gate_scope
 
     def __exit__(self, _exc_type, _exc_value, _traceback):
+        for parameter in self._gate_scope.all_parameters - set(self._gate_scope.circuit.parameters):
+            add_dummy_parameter_reference(self._gate_scope.circuit, parameter)
         self._gate_scope.symbol_table.pop()

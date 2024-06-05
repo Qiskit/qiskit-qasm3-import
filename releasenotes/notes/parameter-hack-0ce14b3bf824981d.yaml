@@ -1,0 +1,14 @@
+---
+fixes:
+  - |
+    The internal-only method of handling circuits that define a parameter that they do not use
+    (such as a program that defines ``input float a;`` but doesn't use ``a``) has changed to
+    avoid using private Qiskit methods.  This makes it more resilient to changing versions
+    of Qiskit.
+upgrade:
+  - |
+    OpenQASM 3 inputs that include ``input float`` parameters that are not used by the program
+    will now parse to circuits that have a global phase that appears parametrised in terms of
+    the otherwise-unused parameter.  The numerical value of the global phase will not be affected,
+    and the global phase will be independent of the parameters.  You can discard the parameter
+    by using ``QuantumCircuit.assign_parameters`` to assign any numeric value to the parameter.

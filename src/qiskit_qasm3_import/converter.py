@@ -33,7 +33,6 @@ from qiskit.circuit import (
     QuantumRegister,
     Qubit,
 )
-from qiskit.circuit.parametertable import ParameterReferences
 from qiskit.transpiler import Layout
 from qiskit.transpiler.layout import TranspileLayout
 from qiskit.circuit.library import standard_gates as _std
@@ -42,7 +41,7 @@ from . import types
 from .data import Scope, Symbol
 from .exceptions import ConversionError, raise_from_node
 from .expression import ValueResolver, resolve_condition
-from .state import State, LocalScope, GateScope
+from .state import State, LocalScope, GateScope, add_dummy_parameter_reference
 
 _QASM2_IDENTIFIER = re.compile(r"[a-z]\w*", flags=re.ASCII)
 
@@ -153,6 +152,8 @@ class ConvertVisitor(QASMVisitor[State]):
                 input_qubit_mapping={bit: i for i, bit in enumerate(state.circuit.qubits)},
                 final_layout=None,
             )
+        for parameter in state.all_parameters - set(state.circuit.parameters):
+            add_dummy_parameter_reference(state.circuit, parameter)
         return state
 
     def _raise_previously_defined(self, new: Symbol, old: Symbol, node: ast.QASMNode) -> NoReturn:
@@ -217,16 +218,6 @@ class ConvertVisitor(QASMVisitor[State]):
                     yield tuple(argument)
 
         return zip(*args())
-
-    def _add_circuit_parameter(self, parameter: Parameter, context: State):
-        # TODO: this is a hack because Terra doesn't have any public way to add a parameter with
-        # no uses to a circuit, but we need to ensure that things work in later bindings if
-        # they're not all there.
-
-        # pylint: disable=protected-access
-        if parameter in context.circuit._parameter_table:
-            return
-        context.circuit._parameter_table[parameter] = ParameterReferences(())
 
     def _resolve_generic(self, node: ast.Expression, context: State) -> Tuple[Any, types.Type]:
         return ValueResolver(context).resolve(node)
@@ -324,7 +315,7 @@ class ConvertVisitor(QASMVisitor[State]):
                 inner.symbol_table.insert(
                     Symbol(parameter.name, parameter, types.Angle(), Scope.GATE, node)
                 )
-                self._add_circuit_parameter(parameter, inner)
+                inner.all_parameters.add(parameter)
             bits = [Qubit() for _ in node.qubits]
             inner.circuit.add_bits(bits)
             for name, bit in zip(node.qubits, bits):
@@ -446,7 +437,7 @@ class ConvertVisitor(QASMVisitor[State]):
         parameter = Parameter(name)
         symbol = Symbol(name, parameter, type, Scope.GLOBAL, node)
         context.symbol_table.insert(symbol)
-        self._add_circuit_parameter(parameter, context)
+        context.all_parameters.add(parameter)
         return context
 
     def visit_BreakStatement(self, node: ast.BreakStatement, context: State) -> State:
@@ -502,7 +493,7 @@ class ConvertVisitor(QASMVisitor[State]):
                 name = node.identifier.name
                 symbol = Symbol(name, parameter, var_type, Scope.LOCAL, node)
                 inner.symbol_table.insert(symbol)
-                self._add_circuit_parameter(parameter, inner)
+                inner.all_parameters.add(parameter)
                 for statement in node.block:
                     self.visit(statement, inner)
         return context
