@@ -524,6 +524,29 @@ def test_parametrised_gate_definition():
     assert qc.data[0].operation.definition == expected
 
 
+def test_parametrised_gate_with_float_ops():
+    # This is against the OQ3 spec (float * angle and angle / float are forbidden), but in practice
+    # the Qiskit OQ3 exporter outputs things like this because of deficiencies in its type system
+    # for `ParameterExpression` and an inability to walk the `symengine` tree.  It's better to allow
+    # them on import than to punish users for Qiskit's problems.
+    source = """
+        qubit q;
+        gate my_gate(p) q0 {
+          U(2.0 * p, 2 * p / 2.0, p / 1.5) q0;
+        }
+        my_gate(pi * 1.5) q;
+    """
+    qc = parse(source)
+    assert len(qc.data) == 1
+    assert qc.data[0].operation.name == "my_gate"
+    assert qc.data[0].qubits == tuple(qc.qubits)
+
+    ang = math.pi * 1.5
+    expected = QuantumCircuit([Qubit()])
+    expected.u(2.0 * ang, 2 * ang / 2.0, ang / 1.5, 0)
+    assert qc.data[0].operation.definition == expected
+
+
 def test_parametrised_gate_without_use():
     # Test that a gate parametrised on an angle that's not actually used in the gate body works.
     source = """

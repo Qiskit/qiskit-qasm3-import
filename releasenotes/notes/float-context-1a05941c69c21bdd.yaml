@@ -1,0 +1,8 @@
+---
+features:
+  - |
+    Gate-parameter contexts now permit ``float`` and ``angle`` types to interact via multiplication
+    and division.  Strictly this is against the OpenQASM 3 specification, but in practice, Qiskit
+    often outputs this kind of expression during its OpenQASM 3 exports, because of problems in how
+    symbolic parameters are represented in Qiskit.  This parser will now accept such statements to
+    work around the technically invalid OpenQASM 3 output by Qiskit.

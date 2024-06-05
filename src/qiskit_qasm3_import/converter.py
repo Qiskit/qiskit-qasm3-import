@@ -219,23 +219,25 @@ class ConvertVisitor(QASMVisitor[State]):
 
         return zip(*args())
 
-    def _resolve_generic(self, node: ast.Expression, context: State) -> Tuple[Any, types.Type]:
-        return ValueResolver(context).resolve(node)
+    def _resolve_generic(
+        self, node: ast.Expression, context: State, strict: bool
+    ) -> Tuple[Any, types.Type]:
+        return ValueResolver(context, strict).resolve(node)
 
     def _resolve_constant_int(self, node: ast.Expression, context: State) -> int:
-        value, type = self._resolve_generic(node, context)
+        value, type = self._resolve_generic(node, context, strict=True)
         if not isinstance(type, (types.Int, types.Uint)) or not type.const:
             raise_from_node(node, "required a constant integer")
         return value
 
     def _resolve_constant_float(self, node: ast.Expression, context: State) -> float:
-        value, type = self._resolve_generic(node, context)
+        value, type = self._resolve_generic(node, context, strict=True)
         if not isinstance(type, (types.Int, types.Uint, types.Float)) or not type.const:
             raise_from_node(node, "required a constant floating-point number")
         return value
 
     def _resolve_constant_duration(self, node: ast.Expression, context: State) -> Tuple[float, str]:
-        value, type = self._resolve_generic(node, context)
+        value, type = self._resolve_generic(node, context, strict=True)
         if not isinstance(type, types.Duration) or not type.const:
             raise_from_node(node, "required a constant duration")
         return value
@@ -243,7 +245,7 @@ class ConvertVisitor(QASMVisitor[State]):
     def _resolve_angle(
         self, node: ast.Expression, context: State
     ) -> Union[float, ParameterExpression]:
-        value, type = self._resolve_generic(node, context)
+        value, type = self._resolve_generic(node, context, strict=False)
         if not isinstance(type, (types.Int, types.Uint, types.Angle, types.Float)):
             raise_from_node(node, "required an angle-like value")
         return value
@@ -251,7 +253,7 @@ class ConvertVisitor(QASMVisitor[State]):
     def _resolve_carg(
         self, node: ast.Expression, context: State
     ) -> Union[Clbit, ClassicalRegister, List[Clbit]]:
-        value, type = self._resolve_generic(node, context)
+        value, type = self._resolve_generic(node, context, strict=True)
         if not isinstance(type, (types.Bit, types.BitArray)):
             raise_from_node(node, "required a bit or bit register")
         return value
@@ -259,7 +261,7 @@ class ConvertVisitor(QASMVisitor[State]):
     def _resolve_qarg(
         self, node: ast.Expression, context: State
     ) -> Union[Qubit, QuantumRegister, List[Qubit]]:
-        value, type = self._resolve_generic(node, context)
+        value, type = self._resolve_generic(node, context, strict=True)
         if not isinstance(type, (types.Qubit, types.HardwareQubit, types.QubitArray)):
             raise_from_node(node, "required a qubit or qubit register")
         return value
@@ -473,7 +475,7 @@ class ConvertVisitor(QASMVisitor[State]):
     def visit_ForInLoop(self, node: ast.ForInLoop, context: State) -> State:
         if not isinstance(node.type, (ast.IntType, ast.UintType)):
             raise_from_node(node, "only integer loop variables are supported")
-        indexset, indextype = self._resolve_generic(node.set_declaration, context)
+        indexset, indextype = self._resolve_generic(node.set_declaration, context, strict=True)
         if not isinstance(indextype, (types.Range, types.Sequence)):
             raise_from_node(
                 node.set_declaration, "only ranges and discrete integer sets are supported"
@@ -508,7 +510,7 @@ class ConvertVisitor(QASMVisitor[State]):
         return context
 
     def visit_AliasStatement(self, node: ast.AliasStatement, context: State) -> State:
-        bits, type = self._resolve_generic(node.value, context)
+        bits, type = self._resolve_generic(node.value, context, strict=True)
         name = node.target.name
         inner_name = _escape_qasm2(name)
         if context.scope is not Scope.GLOBAL:

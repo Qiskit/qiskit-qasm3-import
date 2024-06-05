@@ -335,31 +335,39 @@ def test_binary_operator(op, left_type, right_type, out_type):
 
 
 @pytest.mark.parametrize(
-    ("op", "left_type", "right_type"),
+    ("op", "left_type", "right_type", "nonstrict_type"),
     (
-        ("+", types.Duration(True), types.Float(True, 64)),
-        ("+", types.Int(True, 4), types.Angle(True, 4)),
-        ("-", types.Angle(True, 4), types.Float(True, 64)),
-        ("-", types.Uint(True, 4), types.Angle(False, 3)),
-        ("*", types.Angle(True, 4), types.Angle(True, 4)),
-        ("*", types.Angle(True, 4), types.Float(True, None)),
-        ("*", types.Float(True, None), types.Angle(True, 4)),
-        ("/", types.Angle(True, 4), types.Float(True, None)),
-        ("/", types.Float(True, 64), types.Angle(True, None)),
-        ("/", types.Int(True, 4), types.Angle(True, None)),
+        ("+", types.Duration(True), types.Float(True, 64), None),
+        ("+", types.Int(True, 4), types.Angle(True, 4), None),
+        ("-", types.Angle(True, 4), types.Float(True, 64), None),
+        ("-", types.Uint(True, 4), types.Angle(False, 3), None),
+        ("*", types.Angle(True, 4), types.Angle(True, 4), None),
+        ("*", types.Angle(True, 4), types.Float(True, None), types.Angle(True, 4)),
+        ("*", types.Float(False, None), types.Angle(True, 4), types.Angle(False, 4)),
+        ("/", types.Angle(True, 4), types.Float(True, None), types.Angle(True, 4)),
+        ("/", types.Float(True, 64), types.Angle(True, None), None),
+        ("/", types.Int(True, 4), types.Angle(True, None), None),
     ),
     ids=lambda x: x.pretty() if isinstance(x, types.Type) else x,
 )
-def test_binary_operator_type_error(op, left_type, right_type):
+def test_binary_operator_type_error(op, left_type, right_type, nonstrict_type):
     a, b = Parameter("a"), Parameter("b")
     symbols = [
         Symbol("a", a, left_type, Scope.GLOBAL),
         Symbol("b", b, right_type, Scope.GLOBAL),
     ]
-    resolver = ValueResolver(_make_context(symbols))
     node = ast.BinaryExpression(ast.BinaryOperator[op], ast.Identifier("a"), ast.Identifier("b"))
+    strict_resolver = ValueResolver(_make_context(symbols), strict=True)
     with pytest.raises(ConversionError, match="type error"):
-        resolver.resolve(node)
+        strict_resolver.resolve(node)
+
+    nonstrict_resolver = ValueResolver(_make_context(symbols), strict=False)
+    if nonstrict_type is None:
+        with pytest.raises(ConversionError, match="type error"):
+            nonstrict_resolver.resolve(node)
+    else:
+        _, resolved_type = nonstrict_resolver.resolve(node)
+        assert resolved_type == nonstrict_type
 
 
 @pytest.mark.parametrize(

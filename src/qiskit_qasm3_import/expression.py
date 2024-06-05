@@ -82,12 +82,13 @@ class ValueResolver(QASMVisitor):
     :class:`.State` created in :meth:`.ConvertVisitor.convert()`.
     """
 
-    __slots__ = ("_context",)
+    __slots__ = ("_context", "_strict")
 
     # pylint: disable=no-self-use
 
-    def __init__(self, context: state.State):
+    def __init__(self, context: state.State, strict: bool = True):
         self._context = context
+        self._strict = strict
 
     def resolve(self, node: ast.Expression) -> Tuple[Any, types.Type]:
         """The entry point to the resolver, resolving the AST node into a 2-tuple of a relevant
@@ -233,6 +234,13 @@ class ValueResolver(QASMVisitor):
                 elif isinstance(rhs_type, types.Angle):
                     const = lhs_type.const and rhs_type.const
                     out_type = types.Uint(const, None)
+                # We allow `angle / float` in non-strict mode, because the Qiskit OQ3 exporter does
+                # not / cannot handle `ParameterExpression` well on output, and often outputs things
+                # like that.  That's invalid OQ3, but it's better to support Qiskit's dodgy output
+                # than to complain to the user about it.
+                elif not self._strict and isinstance(rhs_type, types.Float):
+                    const = lhs_type.const and rhs_type.const
+                    out_type = types.Angle(const, lhs_type.size)
             if out_type is not None:
                 out_value = (
                     lhs_value // rhs_value
@@ -242,10 +250,15 @@ class ValueResolver(QASMVisitor):
                 return out_value, out_type
 
         elif node.op is ast.BinaryOperator["*"]:
-            if (
-                isinstance(lhs_type, types.Angle) and isinstance(rhs_type, (types.Int, types.Uint))
-            ) or (
-                isinstance(rhs_type, types.Angle) and isinstance(lhs_type, (types.Int, types.Uint))
+            # We allow `angle * float` in non-strict mode, because the Qiskit OQ3 exporter does not
+            # / cannot handle `ParameterExpression` well on output, and often outputs things like
+            # that.  That's invalid OQ3, but it's better to support Qiskit's dodgy output than to
+            # complain to the user about it.
+            other_types = (
+                (types.Int, types.Uint) if self._strict else (types.Int, types.Uint, types.Float)
+            )
+            if (isinstance(lhs_type, types.Angle) and isinstance(rhs_type, other_types)) or (
+                isinstance(rhs_type, types.Angle) and isinstance(lhs_type, other_types)
             ):
                 const = lhs_type.const and rhs_type.const
                 size = lhs_type.size if isinstance(lhs_type, types.Angle) else rhs_type.size
@@ -309,7 +322,7 @@ def resolve_condition(
     This effectively just handles very special outer cases, then delegates the rest of the work to a
     :class:`.ValueResolver`."""
 
-    value_resolver = ValueResolver(context)
+    value_resolver = ValueResolver(context, strict=True)
 
     if isinstance(node, ast.BinaryExpression):
         if node.op not in (ast.BinaryOperator["=="], ast.BinaryOperator["!="]):
