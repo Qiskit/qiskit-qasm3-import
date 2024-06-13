@@ -1,0 +1,6 @@
+---
+prelude: >
+    The 0.5.0 release makes the default importing mode less strict about
+    mixing floating-point and angle types in gate bodies.  This is to support
+    Qiskit's export, which is unfortunately inconsistent with the letter of the
+    specification due to technical limitiations in Qiskit's internal representation.
