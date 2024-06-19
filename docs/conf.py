@@ -9,6 +9,7 @@ release = qiskit_qasm3_import.__version__
 extensions = [
     "sphinx.ext.autodoc",
     "sphinx.ext.intersphinx",
+    "reno.sphinxext",
     'qiskit_sphinx_theme',
 ]
 exclude_patterns = ['_build', 'Thumbs.db', '.DS_Store']
