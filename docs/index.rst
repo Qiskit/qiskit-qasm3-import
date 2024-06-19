@@ -4,7 +4,8 @@ OpenQASM 3 Importer for Qiskit
 .. toctree:: 
     :hidden: 
  
-    Home <self>
+    API documentation <self>
+    release_notes
 
 .. module:: qiskit_qasm3_import
 
