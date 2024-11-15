@@ -1,0 +1,4 @@
+---
+prelude: >
+    `qiskit-qasm3-import` version 0.5.1 increases the supported versions of the underlying `openqasm3`
+    parser package to reflect the semantic-versioned stability guarantees following its 1.0 release.
