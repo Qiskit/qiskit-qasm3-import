@@ -9,6 +9,9 @@ jobs:
   deploy:
     name: Deploy to PyPI
     runs-on: ubuntu-latest
+    environment: release
+    permissions:
+      id-token: write
 
     steps:
       - uses: actions/checkout@v4
@@ -49,12 +52,6 @@ jobs:
           python3 -c 'import qiskit_qasm3_import'
 
       - name: Upload to PyPI
-        env:
-          TWINE_USERNAME: __token__
-          TWINE_PASSWORD: ${{ secrets.JAKELISHMAN_PYPI_TOKEN }}
-        run: |
-          set -e
-          source .venv/bin/activate
-
-          python3 -mpip install -U twine
-          twine upload ./dist/*.whl ./dist/*.tar.gz
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          packages-dir: dist
