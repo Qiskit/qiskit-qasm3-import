@@ -136,7 +136,7 @@ jobs:
           path: deploy
 
       - name: Repackage for GitHub Pages
-        uses: actions/upload-pages-artifact@v1
+        uses: actions/upload-pages-artifact@v3
         with:
           path: deploy
 
