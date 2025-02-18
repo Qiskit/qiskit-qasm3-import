@@ -854,7 +854,7 @@ def test_delay():
     qc = parse(source)
     expected = QuantumCircuit([Qubit()], QuantumRegister(2, name="qr"))
     expected.delay(10, 0, unit="dt")
-    expected.delay(1, [1, 2], unit="s")
+    expected.delay(1.0, [1, 2], unit="s")
     expected.delay(1.5, unit="ms")
     assert qc == expected
 
