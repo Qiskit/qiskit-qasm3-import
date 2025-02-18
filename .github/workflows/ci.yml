@@ -59,7 +59,7 @@ jobs:
       fail-fast: false
       matrix:
         # Just using minimum and maximum to avoid exploding the matrix.
-        python-version: ['3.8', '3.11']
+        python-version: ['3.9', '3.13']
 
     steps:
       - uses: actions/checkout@v4
@@ -76,6 +76,43 @@ jobs:
           set -e
           py=${{ matrix.python-version }}
           tox -e py${py/./}
+
+  tests-main:
+    name: Run tests (main)
+    runs-on: ubuntu-latest
+
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          path: 'qasm3-import'
+
+      - uses: actions/checkout@v4
+        with:
+          path: 'qiskit'
+          repository: 'Qiskit/qiskit'
+          ref: 'main'
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.10'
+
+      - name: Prepare Python environment
+        run: pip install --upgrade pip tox build
+
+      - name: Build Qiskit
+        working-directory: 'qiskit'
+        run: python -m build --wheel .
+
+      - name: Run tests 
+        working-directory: 'qasm3-import'
+        run: |
+          set -e
+          shopt -s failglob
+          py=${{ matrix.python-version }}
+          env="py${py/./}"
+          tox -e $env --notest
+          .tox/$env/bin/pip install ../qiskit/dist/qiskit-2*.whl
+          tox -e $env
 
   deploy-docs:
     name: Deploy documentation
