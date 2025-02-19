@@ -1234,6 +1234,8 @@ def test_hardware_mode_and_user_gates():
 
 
 def test_box_statements():
+    # pylint: disable=no-member
+
     source = """
         include 'stdgates.inc';
         qubit a;
@@ -1252,6 +1254,7 @@ def test_box_statements():
         with pytest.raises(ConversionError, match="Qiskit 2.0 is required to handle box scopes"):
             _ = parse(source)
     else:
+        qc = parse(source)
         expected = QuantumCircuit([Qubit(), Qubit()])
         with expected.box():
             expected.x(0)
