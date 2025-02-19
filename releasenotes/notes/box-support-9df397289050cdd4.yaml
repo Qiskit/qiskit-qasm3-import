@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    If Qiskit 2.0 is installed, OpenQASM'2 ``box`` statement can now be imported, with or without
+    a duration.

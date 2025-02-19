@@ -14,6 +14,7 @@ __all__ = ["ConvertVisitor"]
 import re
 import string
 import sys
+import warnings
 
 if sys.version_info < (3, 9):
     from typing import Iterator, Sequence
@@ -23,6 +24,7 @@ from typing import Any, Callable, List, NoReturn, Optional, Tuple, Union
 
 from openqasm3 import ast
 from openqasm3.visitor import QASMVisitor
+import qiskit
 from qiskit.circuit import (
     ClassicalRegister,
     Clbit,
@@ -42,6 +44,54 @@ from .data import Scope, Symbol
 from .exceptions import ConversionError, raise_from_node
 from .expression import ValueResolver, resolve_condition
 from .state import State, LocalScope, GateScope, add_dummy_parameter_reference
+
+# This regex in `_VERSION_RE` is taken from
+#       https://packaging.python.org/en/latest/specifications/version-specifiers/
+# which is in turn taken from the Python 'packaging' package, and used under the terms of its BSD
+# licence.  See https://github.com/pypa/packaging for more licensing information.
+_VERSION_RE = re.compile(
+    r"""
+    v?
+    (?:
+        (?:(?P<epoch>[0-9]+)!)?                           # epoch
+        (?P<release>[0-9]+(?:\.[0-9]+)*)                  # release segment
+        (?P<pre>                                          # pre-release
+            [-_\.]?
+            (?P<pre_l>(a|b|c|rc|alpha|beta|pre|preview))
+            [-_\.]?
+            (?P<pre_n>[0-9]+)?
+        )?
+        (?P<post>                                         # post release
+            (?:-(?P<post_n1>[0-9]+))
+            |
+            (?:
+                [-_\.]?
+                (?P<post_l>post|rev|r)
+                [-_\.]?
+                (?P<post_n2>[0-9]+)?
+            )
+        )?
+        (?P<dev>                                          # dev release
+            [-_\.]?
+            (?P<dev_l>dev)
+            [-_\.]?
+            (?P<dev_n>[0-9]+)?
+        )?
+    )
+    (?:\+(?P<local>[a-z0-9]+(?:[-_\.][a-z0-9]+)*))?       # local version
+""",
+    re.VERBOSE | re.IGNORECASE,
+)
+if _match := _VERSION_RE.fullmatch(qiskit.__version__.strip()):
+    # We only need `(major, minor)`, and we're mostly trying to avoid using additional dependencies.
+    # This also has the benefit that we don't fail on `x >= y` checks if `y` is a prerelease of `x`.
+    _QISKIT_VERSION = tuple(int(x) for x in _match["release"].split("."))
+else:
+    warnings.warn(
+        f"Qiskit reported an invalid version number: {qiskit.__version__}."
+        " Detection of Qisit-supported features will not work correctly."
+    )
+    _QISKIT_VERSION = (0, 0, 0)
 
 _QASM2_IDENTIFIER = re.compile(r"[a-z]\w*", flags=re.ASCII)
 
@@ -155,6 +205,16 @@ class ConvertVisitor(QASMVisitor[State]):
         for parameter in state.all_parameters - set(state.circuit.parameters):
             add_dummy_parameter_reference(state.circuit, parameter)
         return state
+
+    def _require_qiskit_version(self, version: tuple[int, ...], feature: str, node: ast.QASMNode):
+        if _QISKIT_VERSION >= version:
+            return
+        req_version = ".".join(map(str, version))
+        raise_from_node(
+            node,
+            f"Qiskit {req_version} is required to handle {feature},"
+            f" but the installed version is {qiskit.__version__}.",
+        )
 
     def _raise_previously_defined(self, new: Symbol, old: Symbol, node: ast.QASMNode) -> NoReturn:
         message = f"'{new.name}' is already defined."
@@ -497,6 +557,19 @@ class ConvertVisitor(QASMVisitor[State]):
                 inner.symbol_table.insert(symbol)
                 inner.all_parameters.add(parameter)
                 for statement in node.block:
+                    self.visit(statement, inner)
+        return context
+
+    def visit_Box(self, node: ast.Box, context: State) -> State:
+        self._require_qiskit_version((2, 0), "box scopes", node)
+        if node.duration is None:
+            duration = None
+            unit = "dt"
+        else:
+            duration, unit = self._resolve_constant_duration(node.duration, context)
+        with context.circuit.box(duration=duration, unit=unit):
+            with LocalScope(context) as inner:
+                for statement in node.body:
                     self.visit(statement, inner)
         return context
 
