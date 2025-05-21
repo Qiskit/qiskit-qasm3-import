@@ -21,5 +21,5 @@ html_theme = "qiskit-ecosystem"
 html_title = f"{project} {release}"
 
 intersphinx_mapping = {
-    "qiskit-terra": ("https://docs.quantum.ibm.com/api/qiskit/", None),
+    "qiskit-terra": ("https://quantum.cloud.ibm.com/docs/api/qiskit/", None),
 }
