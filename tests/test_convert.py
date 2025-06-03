@@ -1262,3 +1262,103 @@ def test_box_statements():
             with expected.box(duration=2, unit="dt"):
                 expected.cz(0, 1)
         assert qc == expected
+
+
+def test_annotated_boxes():
+    # pylint: disable=no-member
+
+    source = """
+        OPENQASM 3.0;
+        @my.str hello, world
+        @my.int 0x04
+        box {
+            @no_payload
+            @no_payload
+            @no_payload.special_unhandled
+            box {
+            }
+        }
+    """
+    if QISKIT_VERSION < (2, 1):
+        with pytest.raises(
+            ConversionError, match="Qiskit 2.1 is required to handle annotations on boxes"
+        ):
+            _ = parse(source)
+        return
+
+    # This import only works in Qiskit 2.1+, which we just checked for.
+    # pylint: disable=import-outside-toplevel,import-error,no-name-in-module
+    from qiskit.circuit import annotation
+
+    class MyInt(annotation.Annotation):
+        namespace = "my.int"
+
+        def __init__(self, x: int):
+            self.x = x
+
+        def __eq__(self, other):
+            return isinstance(other, MyInt) and self.x == other.x
+
+    class MyStr(annotation.Annotation):
+        namespace = "my.str"
+
+        def __init__(self, x: str):
+            self.x = x
+
+        def __eq__(self, other):
+            return isinstance(other, MyStr) and self.x == other.x
+
+    class NoPayload(annotation.Annotation):
+        def __init__(self, ext: str = ""):
+            self.namespace = f"no_payload.{ext}" if ext else "no_payload"
+
+        def __eq__(self, other):
+            return isinstance(other, NoPayload) and self.namespace == other.namespace
+
+    # When using Qiskit < 2.1, pylint can't tell that the `annotation` parameter in `dump` is
+    # necessary for satisfying base-class requirements, even if the tests don't use it.
+    # pylint: disable=unused-argument
+
+    class MySerializer(annotation.OpenQASM3Serializer):
+        def load(self, namespace, payload):
+            assert namespace in ("my.str", "my.int")
+            if namespace == "my.str":
+                return MyStr(payload)
+            return MyInt(int(payload, 16))
+
+        def dump(self, annotation):
+            return NotImplemented
+
+    class NoPayloadSerializer(annotation.OpenQASM3Serializer):
+        def load(self, namespace, payload):
+            if namespace != "no_payload":
+                return NotImplemented
+            assert not payload
+            return NoPayload()
+
+        def dump(self, annotation):
+            return NotImplemented
+
+    class DefaultSerializer(annotation.OpenQASM3Serializer):
+        def load(self, namespace, payload):
+            prefix = "no_payload."
+            assert namespace.startswith(prefix)
+            assert not payload
+            return NoPayload(namespace[len(prefix) :])
+
+        def dump(self, annotation):
+            return NotImplemented
+
+    qc = parse(
+        source,
+        annotation_handlers={
+            "my": MySerializer(),
+            "no_payload": NoPayloadSerializer(),
+            "": DefaultSerializer(),
+        },
+    )
+    expected = QuantumCircuit()
+    with expected.box([MyInt(4), MyStr("hello, world")]):
+        with expected.box([NoPayload("special_unhandled"), NoPayload(), NoPayload()]):
+            pass
+    assert qc == expected
