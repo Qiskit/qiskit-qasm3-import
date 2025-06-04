@@ -1,0 +1,5 @@
+---
+features:
+  - |
+    A data object in the package root, ``VERSION_PARTS``, is now available.
+    This is a tuple of ``int``, representing the major, minor and patch versions.

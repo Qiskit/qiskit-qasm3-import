@@ -12,6 +12,7 @@
 """Basic importer for OpenQASM 3 programmes into Qiskit."""
 
 __version__ = "0.5.1"
+VERSION_PARTS = tuple(int(part) for part in __version__.split("."))
 
 __all__ = ["parse", "convert", "ConversionError"]
 
