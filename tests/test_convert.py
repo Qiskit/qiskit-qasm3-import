@@ -12,8 +12,10 @@
 import math
 
 import numpy as np
+import packaging.version
 import pytest
 
+import qiskit
 from qiskit.circuit import (
     QuantumCircuit,
     QuantumRegister,
@@ -25,6 +27,11 @@ from qiskit.quantum_info import Operator
 from qiskit.transpiler import TranspileLayout, Layout
 
 from qiskit_qasm3_import import parse, ConversionError
+
+
+# We don't care about pre/post specifiers.
+QISKIT_VERSION = packaging.version.parse(qiskit.__version__)
+QISKIT_VERSION = (QISKIT_VERSION.major, QISKIT_VERSION.minor, QISKIT_VERSION.micro)
 
 
 def test_readme_circuit():
@@ -1224,3 +1231,34 @@ def test_hardware_mode_and_user_gates():
     expected = QuantumCircuit([Qubit()])
     expected.u(0, 4.5, 0, 0)
     assert qc.data[1].operation.definition == expected
+
+
+def test_box_statements():
+    # pylint: disable=no-member
+
+    source = """
+        include 'stdgates.inc';
+        qubit a;
+        qubit b;
+
+        box {
+            x a;
+        }
+        box[1.0ms] {
+            box[2dt] {
+                cz a, b;
+            }
+        }
+    """
+    if QISKIT_VERSION < (2, 0):
+        with pytest.raises(ConversionError, match="Qiskit 2.0 is required to handle box scopes"):
+            _ = parse(source)
+    else:
+        qc = parse(source)
+        expected = QuantumCircuit([Qubit(), Qubit()])
+        with expected.box():
+            expected.x(0)
+        with expected.box(duration=1.0, unit="ms"):
+            with expected.box(duration=2, unit="dt"):
+                expected.cz(0, 1)
+        assert qc == expected
