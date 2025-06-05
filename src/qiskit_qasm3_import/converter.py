@@ -9,6 +9,8 @@
 # Any modifications or derivative works of this code must retain this copyright notice, and modified
 # files need to carry a notice indicating that they have been altered from the originals.
 
+from __future__ import annotations
+
 __all__ = ["ConvertVisitor"]
 
 import re
@@ -20,7 +22,7 @@ if sys.version_info < (3, 9):
     from typing import Iterator, Sequence
 else:
     from collections.abc import Iterator, Sequence
-from typing import Any, Callable, List, NoReturn, Optional, Tuple, Union
+from typing import Any, Callable, List, NoReturn, Optional, Tuple, Union, TYPE_CHECKING
 
 from openqasm3 import ast
 from openqasm3.visitor import QASMVisitor
@@ -44,6 +46,10 @@ from .data import Scope, Symbol
 from .exceptions import ConversionError, raise_from_node
 from .expression import ValueResolver, resolve_condition
 from .state import State, LocalScope, GateScope, add_dummy_parameter_reference
+
+if TYPE_CHECKING:
+    # Only present in Qiskit 2.1+, but this is `TYPE_CHECKING`, so we're ok.
+    import qiskit.circuit.annotation
 
 # This regex in `_VERSION_RE` is taken from
 #       https://packaging.python.org/en/latest/specifications/version-specifiers/
@@ -185,6 +191,14 @@ class ConvertVisitor(QASMVisitor[State]):
 
     # pylint: disable=missing-function-docstring,no-self-use,unused-argument
 
+    def __init__(
+        self,
+        annotation_handlers: Optional[
+            dict[str, qiskit.circuit.annotation.OpenQASM3Serializer]
+        ] = None,
+    ):
+        self.annotation_handlers = annotation_handlers or {}
+
     def convert(self, node: ast.Program, *, source: Optional[str] = None) -> QuantumCircuit:
         """Convert a program node into a :class:`~qiskit.circuit.QuantumCircuit`.
 
@@ -278,6 +292,23 @@ class ConvertVisitor(QASMVisitor[State]):
                     yield tuple(argument)
 
         return zip(*args())
+
+    def _parse_annotation(self, node: ast.Annotation, context: State) -> qiskit.circuit.Annotation:
+        self._require_qiskit_version((2, 1), "annotations", node)
+
+        # This import only works in Qiskit 2.1+, which we just checked for.
+        # pylint: disable=import-outside-toplevel,import-error,no-name-in-module
+        from qiskit.circuit.annotation import iter_namespaces
+
+        for parent in iter_namespaces(node.keyword):
+            if ((handler := self.annotation_handlers.get(parent, None)) is not None) and (
+                (result := handler.load(node.keyword, node.command or "")) is not NotImplemented
+            ):
+                return result
+        raise_from_node(
+            node,
+            f"no registered handler could load annotation: '@{node.keyword} {node.payload}'",
+        )
 
     def _resolve_generic(
         self, node: ast.Expression, context: State, strict: bool
@@ -562,12 +593,23 @@ class ConvertVisitor(QASMVisitor[State]):
 
     def visit_Box(self, node: ast.Box, context: State) -> State:
         self._require_qiskit_version((2, 0), "box scopes", node)
-        if node.duration is None:
-            duration = None
-            unit = "dt"
-        else:
+        kwargs = {}
+        if node.duration is not None:
             duration, unit = self._resolve_constant_duration(node.duration, context)
-        with context.circuit.box(duration=duration, unit=unit):
+            kwargs["duration"] = duration
+            kwargs["unit"] = unit
+        if node.annotations:
+            self._require_qiskit_version((2, 1), "annotations on boxes", node)
+            kwargs["annotations"] = [
+                self._parse_annotation(annotation, context)
+                # The `opeqnasm3` parser puts annotations in source-lexicographical order, but
+                # Qiskit's exporter puts the first list item "closest" to the modified item.  We
+                # match Qiskit's behaviour only for consistency, since the OpenQASM 3 spec doesn't
+                # prescribe a particular order of how annotations should be interpreted.
+                for annotation in reversed(node.annotations)
+            ]
+
+        with context.circuit.box(**kwargs):
             with LocalScope(context) as inner:
                 for statement in node.body:
                     self.visit(statement, inner)

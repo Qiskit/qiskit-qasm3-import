@@ -1,0 +1,6 @@
+---
+features:
+  - |
+    :func:`.convert` and :func:`.parse` now have a ``annotation_handlers`` keyword argument, which
+    can be used in conjunction with :class:`~qiskit.circuit.annotation.OpenQASM3Serializer` objects
+    from Qiskit 2.1+ to deserialize custom annotations for ``box`` statements.
