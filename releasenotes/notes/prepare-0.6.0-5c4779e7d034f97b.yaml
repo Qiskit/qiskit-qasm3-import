@@ -1,0 +1,4 @@
+---
+prelude: >
+    Version 0.6.0 includes support for some new features in Qiskit 2, namely the OpenQASM 3 ``box``
+    statement and associated annotations.
