@@ -44,7 +44,7 @@ jobs:
       - name: Build documentation
         run: tox -e docs
 
-      - uses: actions/upload-artifact@v6
+      - uses: actions/upload-artifact@v7
         with:
           name: qiskit-qasm3-import-docs
           path: |
